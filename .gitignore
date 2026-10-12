@@ -1,0 +1,24 @@
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# .NET
+bin/
+obj/
+TestResults/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+
+# Runtime data (uploaded PDFs, extracted images)
+data/
+
+# Local secrets
+appsettings.*.local.json
+.env
