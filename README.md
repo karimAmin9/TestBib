@@ -60,6 +60,9 @@ npm --prefix frontend install
 npm --prefix frontend start
 ```
 
+### Two setups, two databases
+Dev mode uses the database `bib_dev` and stores files in `backend/Bib.Api/data`; the Docker stack uses the database `bib` and the `bookdata` volume. Books uploaded in one setup are therefore not visible in the other.
+
 ### Tests
 
 Run the backend tests. Integration tests start a throw-away Postgres container, so Docker must be running:

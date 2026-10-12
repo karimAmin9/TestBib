@@ -15,6 +15,7 @@ function book(overrides: Partial<BookSummary> = {}): BookSummary {
     error: null,
     verificationStatus: 'Verified',
     pagesWithIssues: 0,
+    excerpt: 'The fog came in early that autumn.',
     hasCover: false,
     createdAt: '2026-10-12T08:00:00Z',
     progress: null,

@@ -1,108 +1,128 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { BooksApi } from '../../core/books.api';
 import { BookSummary } from '../../core/models';
+import { BookCover } from '../../shared/book-cover';
+import { Icon } from '../../shared/icon';
+import { TimeAgoPipe } from '../../shared/time-ago';
 import { VerificationBadge } from '../../shared/verification-badge';
 
+/** One book in the library list, laid out like a ranobes.net "short story" entry. */
 @Component({
   selector: 'app-book-card',
-  imports: [RouterLink, VerificationBadge],
+  imports: [RouterLink, BookCover, Icon, TimeAgoPipe, VerificationBadge],
   template: `
     @let b = book();
-    <a class="card" [routerLink]="['/book', b.id]" [attr.aria-label]="b.title">
-      <div class="cover" [style.background]="placeholderColor()">
-        @if (b.hasCover) {
-          <img [src]="api.coverUrl(b.id)" alt="" loading="lazy" />
-        } @else {
-          <span class="initials">{{ initials() }}</span>
-        }
+    <article class="entry">
+      <a class="cover" [routerLink]="['/book', b.id]" tabindex="-1" aria-hidden="true">
+        <app-book-cover [book]="b" />
         @if (b.status === 'Processing') {
-          <div class="overlay"><span class="spinner" aria-hidden="true"></span>Converting…</div>
-        } @else if (b.status === 'Failed') {
-          <div class="overlay failed">Conversion failed</div>
+          <span class="overlay"><span class="spinner"></span></span>
         }
-        @if (b.progress; as p) {
-          <span class="continue">Continue: Page {{ p.chapterNumber }}</span>
-        }
-      </div>
-      <div class="info">
-        <h3 class="title" [title]="b.title">{{ b.title }}</h3>
+      </a>
+
+      <div class="body">
+        <h2 class="title">
+          <a [routerLink]="['/book', b.id]">{{ b.title }}</a>
+        </h2>
         <div class="meta">
-          {{ b.author ?? 'Unknown author' }}
+          @switch (b.status) {
+            @case ('Ready') {
+              <app-verification-badge
+                [status]="b.verificationStatus"
+                [pagesWithIssues]="b.pagesWithIssues"
+              />
+            }
+            @case ('Processing') {
+              <span class="pill neutral">Converting…</span>
+            }
+            @case ('Failed') {
+              <span class="pill bad">Conversion failed</span>
+            }
+          }
+          <span class="pill">Added: {{ b.createdAt | timeAgo }}</span>
         </div>
-        <div class="meta row">
+        <div class="byline">
+          {{ b.author ?? 'Unknown author' }}
           @if (b.status === 'Ready') {
-            <span>{{ b.pageCount }} pages</span>
-            <app-verification-badge
-              [status]="b.verificationStatus"
-              [pagesWithIssues]="b.pagesWithIssues"
-            />
-          } @else if (b.status === 'Failed') {
-            <span class="err">{{ b.error }}</span>
+            <span class="dot">·</span>{{ b.pageCount }} pages
           }
         </div>
+
+        @if (b.status === 'Failed') {
+          <p class="excerpt error">{{ b.error }}</p>
+        } @else if (b.excerpt) {
+          <p class="excerpt">{{ b.excerpt }}</p>
+        } @else if (b.status === 'Processing') {
+          <p class="excerpt muted">
+            The PDF is being converted and proof-read. This page updates automatically.
+          </p>
+        }
       </div>
-    </a>
+
+      <div class="actions">
+        @if (b.status === 'Ready') {
+          <a class="btn read" [routerLink]="readLink()" [queryParams]="readQuery()">
+            <app-icon name="chevronLeft" [size]="14" [stroke]="3" />Read<app-icon
+              name="chevronRight"
+              [size]="14"
+              [stroke]="3"
+            />
+          </a>
+        } @else {
+          <a class="btn read" [routerLink]="['/book', b.id]">Details</a>
+        }
+        <span class="stats">
+          @if (b.status === 'Ready') {
+            <span title="Pages"><app-icon name="file" [size]="14" />{{ b.pageCount }}</span>
+            @if (progressPercent() !== null) {
+              <span title="Read">{{ progressPercent() }}%</span>
+            }
+          }
+        </span>
+        @if (b.progress; as p) {
+          <a class="link-action" [routerLink]="readLink()" [queryParams]="readQuery()">
+            <app-icon name="bookmark" [size]="14" [filled]="true" />Continue: Page
+            {{ p.chapterNumber }}
+          </a>
+        }
+      </div>
+    </article>
   `,
   styles: `
-    .card {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      color: inherit;
-      text-decoration: none;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      transition:
-        transform 0.15s,
-        box-shadow 0.15s,
-        border-color 0.15s;
-    }
-    .card:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow);
-      border-color: var(--accent);
+    .entry {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      grid-template-areas:
+        'cover body'
+        'actions actions';
+      gap: 18px 24px;
+      padding: 26px 0;
+      border-bottom: 1px solid var(--divider);
     }
     .cover {
+      grid-area: cover;
       position: relative;
+      display: block;
       aspect-ratio: 2 / 3;
-      display: grid;
-      place-items: center;
+      border-radius: 6px;
       overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
-    .cover img {
-      width: 100%;
+    .cover app-book-cover {
       height: 100%;
-      object-fit: cover;
-      object-position: top;
-      background: #fff;
-    }
-    .initials {
-      font-size: 42px;
-      font-weight: 800;
-      color: rgba(255, 255, 255, 0.85);
+      border-radius: 6px;
     }
     .overlay {
       position: absolute;
       inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      background: rgba(10, 12, 16, 0.72);
-      color: var(--text-strong);
-      font-weight: 600;
-    }
-    .overlay.failed {
-      color: var(--bad-fg);
+      display: grid;
+      place-items: center;
+      background: rgba(30, 30, 30, 0.65);
     }
     .spinner {
-      width: 28px;
-      height: 28px;
-      border: 3px solid rgba(255, 255, 255, 0.25);
+      width: 30px;
+      height: 30px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
       border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.9s linear infinite;
@@ -112,65 +132,138 @@ import { VerificationBadge } from '../../shared/verification-badge';
         transform: rotate(360deg);
       }
     }
-    .continue {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding: 6px 8px;
-      background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
-      color: #fff;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .info {
-      padding: 10px 12px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .body {
+      grid-area: body;
+      min-width: 0;
     }
     .title {
-      margin: 0;
-      font-size: 15px;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .title a {
+      color: var(--text);
+    }
+    .title a:hover {
+      color: var(--text-strong);
+      text-decoration: none;
     }
     .meta {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-    .row {
       display: flex;
       flex-wrap: wrap;
+      gap: 6px 10px;
+      margin-bottom: 8px;
+    }
+    .byline {
+      margin-bottom: 10px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .dot {
+      margin: 0 6px;
+    }
+    .excerpt {
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .excerpt.error {
+      color: var(--bad-fg);
+    }
+    .actions {
+      grid-area: actions;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: 44px;
+      padding-right: 22px;
+      border-radius: 24px;
+      background: rgba(0, 0, 0, 0.12);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+    .read {
+      height: 44px;
+      min-width: 150px;
+      gap: 6px;
+    }
+    .stats {
+      display: flex;
+      gap: 26px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .stats span {
+      display: inline-flex;
       align-items: center;
       gap: 6px;
     }
-    .err {
-      color: var(--bad-fg);
+    .link-action {
+      margin-left: auto;
+    }
+
+    @media (max-width: 600px) {
+      .entry {
+        display: block;
+        padding: 20px 0;
+      }
+      .entry::after {
+        content: '';
+        display: table;
+        clear: both;
+      }
+      .cover {
+        float: left;
+        width: 104px;
+        margin: 0 14px 8px 0;
+      }
+      .title {
+        font-size: 17px;
+      }
+      .excerpt {
+        -webkit-line-clamp: 5;
+      }
+      .actions {
+        clear: both;
+        position: relative;
+        top: 12px;
+        margin-bottom: 12px;
+        padding-right: 16px;
+      }
+      .read {
+        min-width: 116px;
+      }
+      .stats {
+        display: none;
+      }
+      .link-action {
+        font-size: 11px;
+      }
     }
   `,
 })
 export class BookCard {
-  protected readonly api = inject(BooksApi);
   readonly book = input.required<BookSummary>();
 
-  protected readonly initials = computed(() =>
-    this.book()
-      .title.split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0]!.toUpperCase())
-      .join(''),
-  );
+  protected readonly readLink = computed(() => [
+    '/book',
+    this.book().id,
+    'read',
+    this.book().progress?.chapterNumber ?? 1,
+  ]);
 
-  protected readonly placeholderColor = computed(() => {
-    let hash = 0;
-    for (const ch of this.book().title) {
-      hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  protected readonly readQuery = computed(() => {
+    const p = this.book().progress;
+    return p ? { pos: p.scrollPercent } : {};
+  });
+
+  protected readonly progressPercent = computed(() => {
+    const b = this.book();
+    if (!b.progress || b.pageCount === 0) {
+      return null;
     }
-    const hue = Math.abs(hash) % 360;
-    return `linear-gradient(160deg, hsl(${hue} 45% 35%), hsl(${(hue + 40) % 360} 50% 18%))`;
+    return Math.round((100 * b.progress.chapterNumber) / b.pageCount);
   });
 }

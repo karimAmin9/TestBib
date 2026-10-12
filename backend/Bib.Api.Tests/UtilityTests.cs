@@ -51,6 +51,24 @@ public sealed class TextNormalizerTests
         Assert.Equal(placeholder, PdfProcessor.IsPlaceholderTitle(title));
 
     [Fact]
+    public void Excerpt_skips_headings_and_cuts_at_a_word_boundary()
+    {
+        var longText = string.Join(' ', Enumerable.Repeat("lighthouse", 60));
+        var chapters = new[]
+        {
+            new ProcessedChapter(1, [ContentBlock.Heading("Chapter One"), ContentBlock.Paragraph("Short start.")], []),
+            new ProcessedChapter(2, [ContentBlock.Paragraph(longText)], []),
+        };
+
+        var excerpt = Bib.Api.Processing.BookConversionService.BuildExcerpt(chapters)!;
+
+        Assert.StartsWith("Short start. lighthouse", excerpt);
+        Assert.EndsWith("lighthouse…", excerpt);
+        Assert.True(excerpt.Length <= Bib.Api.Processing.BookConversionService.ExcerptLength + 1);
+        Assert.Null(Bib.Api.Processing.BookConversionService.BuildExcerpt([new ProcessedChapter(1, [], [])]));
+    }
+
+    [Fact]
     public void Joining_lines_records_removed_hyphens()
     {
         var removed = new List<Removal>();

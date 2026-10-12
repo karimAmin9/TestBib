@@ -49,6 +49,7 @@ public sealed class BookConversionService(
             book.Author ??= processed.Author;
             book.PageCount = processed.PageCount;
             book.HasCover = processed.CoverPng is not null;
+            book.Excerpt = BuildExcerpt(processed.Chapters);
             await db.SaveChangesAsync(ct);
 
             // Proof-read what was actually stored, not the in-memory result.
@@ -92,6 +93,41 @@ public sealed class BookConversionService(
             logger.LogWarning(ex, "Conversion failed");
             await MarkFailedAsync(bookId, ex is PdfProcessingException ? ex.Message : "Unexpected error while converting this PDF.");
         }
+    }
+
+    public const int ExcerptLength = 420;
+
+    /// <summary>The first paragraphs of the book (headings skipped), cut at a word boundary.</summary>
+    public static string? BuildExcerpt(IEnumerable<ProcessedChapter> chapters)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var block in chapters.SelectMany(c => c.Blocks).Where(b => b.Type == BlockTypes.Paragraph))
+        {
+            if (sb.Length > 0)
+            {
+                sb.Append(' ');
+            }
+
+            sb.Append(block.Text);
+            if (sb.Length >= ExcerptLength)
+            {
+                break;
+            }
+        }
+
+        if (sb.Length == 0)
+        {
+            return null;
+        }
+
+        if (sb.Length <= ExcerptLength)
+        {
+            return sb.ToString();
+        }
+
+        var cut = sb.ToString(0, ExcerptLength);
+        var space = cut.LastIndexOf(' ');
+        return (space > ExcerptLength / 2 ? cut[..space] : cut).TrimEnd(',', ';', ':', ' ') + "…";
     }
 
     private async Task MarkFailedAsync(Guid bookId, string message)

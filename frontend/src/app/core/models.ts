@@ -22,6 +22,7 @@ export interface BookSummary {
   error: string | null;
   verificationStatus: VerificationStatus;
   pagesWithIssues: number;
+  excerpt: string | null;
   hasCover: boolean;
   createdAt: string;
   progress: Progress | null;

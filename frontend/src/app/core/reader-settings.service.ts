@@ -13,8 +13,8 @@ export interface ReaderSettings {
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
   theme: 'dark',
-  font: 'serif',
-  fontSize: 19,
+  font: 'sans',
+  fontSize: 17,
   lineHeight: 1.7,
   width: 760,
 };
@@ -42,7 +42,7 @@ export class ReaderSettingsService {
       '--reader-font':
         s.font === 'serif'
           ? "'Literata', Georgia, 'Times New Roman', serif"
-          : "'Inter', 'Segoe UI', Roboto, Arial, sans-serif",
+          : "'Montserrat', 'Gotham Pro', Arial, sans-serif",
     };
   });
 

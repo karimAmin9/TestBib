@@ -1,9 +1,13 @@
 import { HttpEventType } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { errorMessages } from '../../core/auth.service';
 import { BooksApi } from '../../core/books.api';
 import { BookSummary } from '../../core/models';
+import { BookCover } from '../../shared/book-cover';
+import { Icon } from '../../shared/icon';
+import { TimeAgoPipe } from '../../shared/time-ago';
 import { BookCard } from './book-card';
 
 export const POLL_INTERVAL_MS = 2000;
@@ -14,19 +18,29 @@ interface Upload {
   percent: number;
 }
 
+type SideTab = 'continue' | 'recent';
+
 @Component({
   selector: 'app-library',
-  imports: [BookCard],
+  imports: [BookCard, BookCover, Icon, RouterLink, TimeAgoPipe],
   template: `
-    <div class="page">
-      <h2 class="section-title">My library</h2>
+    <div class="page with-sidebar">
+      <section class="main">
+        <div class="head">
+          <h1 class="section-title">My library</h1>
+          @if (loaded()) {
+            <span class="muted small"
+              >{{ books().length }} {{ books().length === 1 ? 'book' : 'books' }}</span
+            >
+          }
+        </div>
 
-      @if (error(); as e) {
-        <div class="error-box" role="alert">{{ e }}</div>
-      }
+        @if (error(); as e) {
+          <div class="error-box" role="alert">{{ e }}</div>
+        }
 
-      <div class="grid">
         <label
+          id="upload"
           class="upload"
           [class.dragging]="dragging()"
           (dragover)="onDragOver($event)"
@@ -40,95 +54,169 @@ interface Upload {
             (change)="onPick($event)"
             [disabled]="!!upload()"
           />
+          <span class="upload-icon"><app-icon name="upload" [size]="22" /></span>
           @if (upload(); as u) {
-            <span class="upload-title">Uploading…</span>
-            <span class="upload-name" [title]="u.name">{{ u.name }}</span>
-            <span class="bar"><span [style.width.%]="u.percent"></span></span>
-            <span class="muted">{{ u.percent }}%</span>
+            <span class="upload-text">
+              <strong>Uploading {{ u.name }}</strong>
+              <span class="bar"><span [style.width.%]="u.percent"></span></span>
+            </span>
+            <span class="upload-cta muted">{{ u.percent }}%</span>
           } @else {
-            <span class="plus" aria-hidden="true">+</span>
-            <span class="upload-title">Add a PDF</span>
-            <span class="muted small">Click or drop a file here<br />(max. 100 MB)</span>
+            <span class="upload-text">
+              <strong>Add a PDF to your library</strong>
+              <span class="muted small">Drop a file here or click to choose · max. 100 MB</span>
+            </span>
+            <span class="btn small upload-cta">Choose file</span>
           }
         </label>
 
         @for (book of books(); track book.id) {
           <app-book-card [book]="book" />
         }
-      </div>
 
-      @if (loaded() && books().length === 0) {
-        <p class="empty muted">
-          Your library is empty. Upload a PDF to turn it into a book you can read here.
-        </p>
-      }
+        @if (loaded() && books().length === 0) {
+          <p class="empty muted">
+            Your library is empty. Upload a PDF and it will appear here as a book you can read.
+          </p>
+        }
+      </section>
+
+      <aside class="sidebar">
+        <div class="side-block">
+          <div class="tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              [class.active]="tab() === 'continue'"
+              [attr.aria-selected]="tab() === 'continue'"
+              (click)="tab.set('continue')"
+            >
+              Continue
+            </button>
+            <button
+              type="button"
+              role="tab"
+              [class.active]="tab() === 'recent'"
+              [attr.aria-selected]="tab() === 'recent'"
+              (click)="tab.set('recent')"
+            >
+              Recently added
+            </button>
+          </div>
+
+          @for (b of sideList(); track b.id) {
+            <a
+              class="thumb-row"
+              [routerLink]="
+                b.progress && tab() === 'continue'
+                  ? ['/book', b.id, 'read', b.progress.chapterNumber]
+                  : ['/book', b.id]
+              "
+            >
+              <app-book-cover class="thumb" [book]="b" />
+              <span>
+                <span class="thumb-title" [title]="b.title">{{ b.title }}</span>
+                <span class="thumb-meta">
+                  @if (tab() === 'continue' && b.progress) {
+                    Page {{ b.progress.chapterNumber }} of {{ b.pageCount }} ·
+                    {{ b.progress.updatedAt | timeAgo }}
+                  } @else {
+                    {{ b.pageCount ? b.pageCount + ' pages · ' : '' }}{{ b.createdAt | timeAgo }}
+                  }
+                </span>
+              </span>
+            </a>
+          } @empty {
+            <p class="muted small">
+              {{ tab() === 'continue' ? 'Books you start reading show up here.' : 'No books yet.' }}
+            </p>
+          }
+        </div>
+
+        <div class="side-block">
+          <h2 class="section-title">Library statistics</h2>
+          <div class="stat-row">
+            <span>Books</span><strong>{{ books().length }}</strong>
+          </div>
+          <div class="stat-row">
+            <span>Pages</span><strong>{{ totalPages() }}</strong>
+          </div>
+          <div class="stat-row">
+            <span>Verified 1:1</span><strong>{{ verified() }} / {{ readyCount() }}</strong>
+            <span class="bar ok"
+              ><span [style.width.%]="readyCount() ? (100 * verified()) / readyCount() : 0"></span
+            ></span>
+          </div>
+          <div class="stat-row">
+            <span>Started reading</span><strong>{{ started() }} / {{ readyCount() }}</strong>
+            <span class="bar"
+              ><span [style.width.%]="readyCount() ? (100 * started()) / readyCount() : 0"></span
+            ></span>
+          </div>
+        </div>
+      </aside>
     </div>
   `,
   styles: `
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 18px;
-    }
-    @media (max-width: 480px) {
-      .grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-      }
+    .head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
     }
     .upload {
-      aspect-ratio: 2 / 3.6;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 16px;
-      text-align: center;
+      gap: 16px;
+      padding: 16px 18px;
+      margin-bottom: 6px;
       border: 2px dashed var(--border);
       border-radius: var(--radius);
-      background: var(--surface);
+      background: rgba(0, 0, 0, 0.08);
       cursor: pointer;
+      scroll-margin-top: 80px;
       transition:
         border-color 0.15s,
         background 0.15s;
     }
     .upload:hover,
     .upload.dragging,
-    .upload:focus-within {
+    .upload:focus-within,
+    .upload:target {
       border-color: var(--accent);
-      background: var(--surface-2);
+      background: var(--accent-bg);
     }
-    .plus {
+    .upload-icon {
       display: grid;
       place-items: center;
-      width: 52px;
-      height: 52px;
+      flex: 0 0 auto;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       background: var(--accent);
-      color: #fff;
-      font-size: 30px;
-      line-height: 1;
+      color: #2f3a24;
     }
-    .upload-title {
-      font-weight: 700;
-      color: var(--text-strong);
+    .upload-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      flex: 1;
     }
-    .upload-name {
-      max-width: 100%;
+    .upload-text strong {
       overflow: hidden;
+      color: var(--text-strong);
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 13px;
     }
-    .small {
-      font-size: 13px;
+    .upload-cta {
+      flex: 0 0 auto;
     }
     .bar {
-      width: 100%;
+      display: block;
       height: 6px;
       border-radius: 3px;
-      background: var(--bg);
+      background: rgba(0, 0, 0, 0.25);
       overflow: hidden;
     }
     .bar span {
@@ -139,6 +227,16 @@ interface Upload {
     }
     .empty {
       margin-top: 24px;
+    }
+    .thumb-row > span {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    @media (max-width: 480px) {
+      .upload-cta.btn {
+        display: none;
+      }
     }
   `,
 })
@@ -151,9 +249,32 @@ export class Library implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly upload = signal<Upload | null>(null);
   protected readonly dragging = signal(false);
+  protected readonly tab = signal<SideTab>('continue');
   protected readonly hasProcessing = computed(() =>
     this.books().some((b) => b.status === 'Processing'),
   );
+
+  protected readonly readyCount = computed(
+    () => this.books().filter((b) => b.status === 'Ready').length,
+  );
+  protected readonly verified = computed(
+    () => this.books().filter((b) => b.verificationStatus === 'Verified').length,
+  );
+  protected readonly started = computed(() => this.books().filter((b) => b.progress).length);
+  protected readonly totalPages = computed(() =>
+    this.books().reduce((sum, b) => sum + b.pageCount, 0),
+  );
+
+  protected readonly sideList = computed(() => {
+    const books = this.books();
+    if (this.tab() === 'continue') {
+      return books
+        .filter((b) => b.progress)
+        .sort((a, b) => b.progress!.updatedAt.localeCompare(a.progress!.updatedAt))
+        .slice(0, 8);
+    }
+    return books.slice(0, 8);
+  });
 
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.pollTimer));

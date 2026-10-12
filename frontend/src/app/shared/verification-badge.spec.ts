@@ -13,13 +13,13 @@ describe('VerificationBadge', () => {
   it('shows a verified badge', () => {
     const el = render('Verified');
     expect(el.textContent).toContain('Verified 1:1');
-    expect(el.querySelector('.ok')).not.toBeNull();
+    expect(el.querySelector('.pill.ok')).not.toBeNull();
   });
 
   it('shows the number of differing pages', () => {
     const el = render('Differences', 3);
     expect(el.textContent).toContain('3 pages differ');
-    expect(el.querySelector('.bad')).not.toBeNull();
+    expect(el.querySelector('.pill.bad')).not.toBeNull();
   });
 
   it('uses singular for one page with notes', () => {

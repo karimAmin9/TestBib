@@ -8,7 +8,7 @@ import { AuthService, errorMessages } from '../../core/auth.service';
   imports: [FormsModule, RouterLink],
   template: `
     <div class="page">
-      <form class="panel card" (ngSubmit)="submit()" #form="ngForm">
+      <form class="card" (ngSubmit)="submit()" #form="ngForm">
         <h1>{{ isRegister() ? 'Create your library' : 'Welcome back' }}</h1>
         <p class="muted">
           {{
@@ -62,14 +62,19 @@ import { AuthService, errorMessages } from '../../core/auth.service';
     </div>
   `,
   styles: `
+    .page {
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+    }
     .card {
+      width: 100%;
       max-width: 400px;
-      margin: 48px auto;
-      padding: 28px;
+      padding: 8px 0;
     }
     h1 {
       margin: 0 0 4px;
-      font-size: 24px;
+      font-size: 22px;
     }
     p {
       margin: 0 0 20px;

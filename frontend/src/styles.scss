@@ -1,26 +1,43 @@
-/* Site-wide design tokens: a dark, ranobes-like library look. */
+/*
+ * Site-wide design system, modelled on the ranobes.net look:
+ * charcoal page, one rounded content panel, pill buttons, muted green accents.
+ */
 :root {
   color-scheme: dark;
-  --page-width: 1200px;
-  --bg: #15171c;
-  --surface: #1e2128;
-  --surface-2: #262a33;
-  --topbar-bg: #1a1d23;
-  --border: #2e333d;
-  --text: #d5d8de;
-  --text-strong: #f3f4f6;
-  --text-muted: #9198a5;
-  --accent: #e2574c;
-  --accent-hover: #f06b60;
-  --link: #6fb1ff;
-  --ok-bg: rgba(46, 160, 67, 0.18);
-  --ok-fg: #5fd17a;
-  --warn-bg: rgba(210, 153, 34, 0.18);
-  --warn-fg: #f0b54a;
-  --bad-bg: rgba(226, 87, 76, 0.18);
-  --bad-fg: #ff8a80;
+
+  --page-width: 1250px;
+  --rail-width: 64px;
+  --sidebar-width: 300px;
+  --topbar-height: 56px;
+
+  --bg: #3b3a3a;
+  --panel: #474747;
+  --panel-dark: #3f3f3f;
+  --surface-2: #525252;
+  --border: #565656;
+  --divider: #3d3d3d;
+  --text: #cccccc;
+  --text-strong: #ededed;
+  --text-muted: #999999;
+  --link: #4a8bdb;
+  --accent: #95ac7c;
+  --accent-bg: rgba(149, 172, 124, 0.14);
+  --btn: #626262;
+  --btn-hover: #707070;
+  --btn-light: #dcdcdc;
+  --star: #f2c14e;
+
+  --ok-bg: rgba(149, 172, 124, 0.14);
+  --ok-fg: #95ac7c;
+  --warn-bg: rgba(226, 178, 84, 0.15);
+  --warn-fg: #e2b254;
+  --bad-bg: rgba(225, 112, 98, 0.15);
+  --bad-fg: #f08b7e;
+
   --radius: 8px;
-  --shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  --pill: 20px;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --font: 'Montserrat', 'Gotham Pro', Arial, Helvetica, sans-serif;
 }
 
 * {
@@ -32,116 +49,299 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+img {
+  max-width: 100%;
 }
 
 a {
   color: var(--link);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 h1,
 h2,
 h3 {
-  color: var(--text-strong);
+  color: var(--text);
   line-height: 1.25;
+  font-weight: 700;
 }
 
+/* ---------- Layout ---------- */
+
+/** The single rounded content panel every page sits in. */
 .page {
   max-width: var(--page-width);
-  margin: 0 auto;
-  padding: 24px 16px 48px;
-}
-
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  margin: 16px auto 32px;
+  background: var(--panel);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-height: calc(100vh - 48px);
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 16px;
-  font-size: 18px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+/** Main column + right sidebar, separated by a hairline like ranobes. */
+.with-sidebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
 
-  &::before {
-    content: '';
-    width: 4px;
-    height: 20px;
-    border-radius: 2px;
-    background: var(--accent);
+  > .main {
+    padding: 24px 28px;
+    min-width: 0;
+  }
+
+  > .sidebar {
+    border-left: 1px solid var(--divider);
+    padding: 24px 22px;
+    min-width: 0;
   }
 }
+
+@media (max-width: 1080px) {
+  .with-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+
+    > .sidebar {
+      border-left: 0;
+      border-top: 1px solid var(--divider);
+    }
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    min-height: calc(100vh - var(--topbar-height));
+  }
+
+  .with-sidebar > .main,
+  .with-sidebar > .sidebar {
+    padding: 18px 16px;
+  }
+}
+
+/* ---------- Typography helpers ---------- */
+
+.section-title {
+  margin: 0 0 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.breadcrumbs {
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+
+  a {
+    color: var(--text);
+  }
+
+  .sep {
+    margin: 0 6px;
+  }
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 12px;
+}
+
+/* ---------- Buttons ---------- */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 16px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
+  gap: 8px;
+  height: 40px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--pill);
+  background: var(--btn);
+  color: #efefef;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   font: inherit;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
   text-decoration: none;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background 0.15s,
-    border-color 0.15s;
+    color 0.15s;
 
   &:hover:not(:disabled) {
-    background: var(--accent-hover);
+    background: var(--btn-hover);
+    text-decoration: none;
   }
+
   &:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
     cursor: default;
   }
-  &.ghost {
-    background: transparent;
-    border-color: var(--border);
-    color: var(--text);
+
+  /** Light "START READING" style button. */
+  &.light {
+    background: var(--btn-light);
+    color: #333;
+
     &:hover:not(:disabled) {
-      background: var(--surface-2);
+      background: #fff;
     }
   }
-  &.danger {
-    background: transparent;
-    border-color: var(--bad-fg);
-    color: var(--bad-fg);
+
+  &.ghost {
+    background: rgba(0, 0, 0, 0.21);
   }
+
   &.small {
-    height: 30px;
-    padding: 0 10px;
-    font-size: 13px;
+    height: 32px;
+    padding: 0 14px;
+    font-size: 11px;
+  }
+
+  &.block {
+    width: 100%;
   }
 }
+
+/** Uppercase green text action ("BOOKMARK", "OPTIONS", "SUBSCRIBE"). */
+.link-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &:hover {
+    color: #b3c99b;
+    text-decoration: none;
+  }
+
+  &.danger {
+    color: var(--bad-fg);
+  }
+}
+
+/** Small rounded label ("UP: 2 DAYS AGO"). */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 16px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  &::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  &.warn {
+    background: var(--warn-bg);
+    color: var(--warn-fg);
+  }
+
+  &.bad {
+    background: var(--bad-bg);
+    color: var(--bad-fg);
+  }
+
+  &.neutral {
+    background: rgba(0, 0, 0, 0.18);
+    color: var(--text);
+  }
+}
+
+/** Two-option segmented control (sidebar tabs). */
+.tabs {
+  display: flex;
+  padding: 3px;
+  margin-bottom: 18px;
+  border-radius: var(--pill);
+  background: rgba(0, 0, 0, 0.2);
+
+  button {
+    flex: 1;
+    height: 30px;
+    border: 0;
+    border-radius: var(--pill);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &.active {
+      background: var(--btn-light);
+      color: #383838;
+    }
+  }
+}
+
+/* ---------- Forms ---------- */
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-bottom: 14px;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 
   input,
   select {
-    height: 40px;
-    padding: 0 12px;
-    border-radius: 6px;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: var(--pill);
     border: 1px solid var(--border);
-    background: var(--bg);
+    background: var(--panel-dark);
     color: var(--text-strong);
     font: inherit;
+    font-size: 14px;
+    text-transform: none;
+    letter-spacing: 0;
+
     &:focus {
       outline: 2px solid var(--accent);
       outline-offset: -1px;
@@ -150,17 +350,99 @@ h3 {
 }
 
 .error-box {
-  padding: 10px 12px;
+  padding: 10px 14px;
   margin-bottom: 14px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--bad-bg);
   color: var(--bad-fg);
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.muted {
-  color: var(--text-muted);
+/* ---------- Sidebar widgets ---------- */
+
+.side-block + .side-block {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--divider);
 }
+
+/** Row with a round thumbnail, like ranobes' "Best novels" list. */
+.thumb-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 7px 0;
+  color: inherit;
+
+  &:hover {
+    text-decoration: none;
+
+    .thumb-title {
+      color: var(--text-strong);
+    }
+  }
+
+  .thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: top;
+    background: var(--surface-2);
+  }
+
+  .thumb-title {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .thumb-meta {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+}
+
+/** Horizontal statistic bar ("Bookmark statistics"). */
+.stat-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 12px;
+
+  .bar {
+    grid-column: 1 / -1;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+
+    span {
+      display: block;
+      height: 100%;
+      border-radius: 3px;
+      background: var(--text-muted);
+    }
+
+    &.ok span {
+      background: var(--accent);
+    }
+    &.warn span {
+      background: var(--warn-fg);
+    }
+    &.bad span {
+      background: var(--bad-fg);
+    }
+  }
+}
+
+/* ---------- Misc ---------- */
 
 :focus-visible {
   outline: 2px solid var(--accent);

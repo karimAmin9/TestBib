@@ -30,6 +30,9 @@
               }
             ],
             "styles": [
+              "@fontsource/montserrat/400.css",
+              "@fontsource/montserrat/500.css",
+              "@fontsource/montserrat/700.css",
               "src/styles.scss"
             ]
           },

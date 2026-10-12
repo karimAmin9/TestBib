@@ -38,6 +38,7 @@ public sealed class BooksApiTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.Equal("Verified", book.VerificationStatus);
         Assert.Equal(0, book.PagesWithIssues);
         Assert.Equal(("The Lighthouse", "A. Keeper", 3), (book.Title, book.Author, book.PageCount));
+        Assert.StartsWith("The keeper climbed the stairs. He lit the lamp.", book.Excerpt);
         Assert.True(book.HasCover);
 
         var report = (await client.GetFromJsonAsync<VerificationReport>($"/api/books/{book.Id}/verification"))!;

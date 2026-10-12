@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { Chapter, PageVerification } from '../../core/models';
-import { PROGRESS_DEBOUNCE_MS, Reader } from './reader';
+import { PROGRESS_DEBOUNCE_MS, Reader, displaySize } from './reader';
 
 function chapter(overrides: Partial<Chapter> = {}): Chapter {
   return {
@@ -73,7 +73,9 @@ describe('Reader', () => {
   it('renders paragraphs and images in order', async () => {
     const f = await open();
 
-    const blocks = Array.from(el(f).querySelectorAll('article > p, article > h2, article > figure'));
+    const blocks = Array.from(
+      el(f).querySelectorAll('article > p, article > h2, article > figure'),
+    );
     expect(blocks.map((b) => b.tagName)).toEqual(['H2', 'P', 'FIGURE', 'P']);
     expect(blocks[0]!.textContent).toBe('Chapter Two');
     expect(blocks[1]!.textContent).toBe('First paragraph.');
@@ -171,5 +173,27 @@ describe('Reader', () => {
     const f = await open();
 
     expect(el(f).querySelector('.reader')!.classList).toContain('theme-sepia');
+  });
+});
+
+describe('displaySize', () => {
+  it('uses the pixel size for extracted images', () => {
+    expect(displaySize({ type: 'img', src: 'p1-1.jpg', w: 800, h: 600 })).toEqual({
+      w: 800,
+      h: 600,
+    });
+  });
+
+  it('halves images rendered from vector pages at 2x', () => {
+    expect(
+      displaySize({ type: 'img', src: 'p1-page.png', w: 1190, h: 1684, rendered: true }),
+    ).toEqual({
+      w: 595,
+      h: 842,
+    });
+  });
+
+  it('leaves the size to the browser when unknown', () => {
+    expect(displaySize({ type: 'img', src: 'p1-1.png' })).toEqual({ w: null, h: null });
   });
 });

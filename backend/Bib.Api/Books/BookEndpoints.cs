@@ -295,6 +295,7 @@ public static class BookEndpoints
         b.Error,
         b.VerificationStatus.ToString(),
         b.PagesWithIssues,
+        b.Excerpt,
         b.HasCover,
         b.CreatedAt,
         p is null ? null : new ProgressDto(p.ChapterNumber, p.ScrollPercent, p.UpdatedAt));

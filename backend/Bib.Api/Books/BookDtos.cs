@@ -13,6 +13,7 @@ public sealed record BookSummaryDto(
     string? Error,
     string VerificationStatus,
     int PagesWithIssues,
+    string? Excerpt,
     bool HasCover,
     DateTimeOffset CreatedAt,
     ProgressDto? Progress);

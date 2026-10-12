@@ -1,36 +1,12 @@
 import { Component, computed, input } from '@angular/core';
 import { VerificationStatus } from '../core/models';
 
-/** Shows whether the conversion was proof-read 1:1 against the PDF. */
+/** Pill showing whether the conversion was proof-read 1:1 against the PDF. */
 @Component({
   selector: 'app-verification-badge',
   template: `
     @if (label(); as l) {
-      <span [class]="'badge ' + l.kind" [attr.title]="l.title">{{ l.text }}</span>
-    }
-  `,
-  styles: `
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .ok {
-      background: var(--ok-bg);
-      color: var(--ok-fg);
-    }
-    .warn {
-      background: var(--warn-bg);
-      color: var(--warn-fg);
-    }
-    .bad {
-      background: var(--bad-bg);
-      color: var(--bad-fg);
+      <span [class]="'pill ' + l.kind" [attr.title]="l.title">{{ l.text }}</span>
     }
   `,
 })

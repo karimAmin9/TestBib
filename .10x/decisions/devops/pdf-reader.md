@@ -12,3 +12,4 @@
   - a CI pipeline (GitHub Actions: `dotnet test` with Docker available, `ng test`, image build)
   - an image registry
   - TLS termination (Caddy/Traefik in front of `web`)
+- **Dev vs Docker data separation (2026-10-12):** dev mode uses database `bib_dev` (+ `backend/Bib.Api/data`), the Docker stack uses `bib` (+ `bookdata` volume). Previously both shared `bib`, so books uploaded in one mode showed up with missing files in the other.

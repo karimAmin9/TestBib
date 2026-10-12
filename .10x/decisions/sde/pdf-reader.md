@@ -15,3 +15,12 @@
 ## Tech debt
 - Single-instance worker (ADR-004). Upload size check happens after the body is received (Kestrel limit 101 MB caps it).
 - Book detail chapter list loads all chapter titles (fine up to thousands of pages).
+
+## 2026-10-12 — ranobes.net look & responsive redesign
+- Design taken from ranobes.net (via web.archive.org; live site is behind a CAPTCHA): charcoal page #3b3a3a, panel #474747 r8, text #ccc, muted #999, green accent #95ac7c, pill buttons #626262, Gotham-like font (Montserrat via @fontsource, self-hosted — no external requests, CSP unchanged).
+- Shell: left icon rail (desktop) → sticky top bar + hamburger menu (≤760px).
+- Library: ranobes "short story" list cards (cover, title, pills, byline, excerpt, READ pill bar, green Continue action) + sidebar (Continue/Recently added tabs, statistics). New `Book.Excerpt` (migration `BookExcerpt`).
+- Book page: cover column with START READING/CHAPTERS LIST + facts, center info + scrolling chapter list, sidebar "Conversion check" bars + progress + manage.
+- Reader: breadcrumbs, OPTIONS (inline settings), page select, « BACK / CHAPTERS LIST / NEXT » pills, nearby-pages sidebar ≥1080px. Images: width/height hints, max-width 100%, max-height 85vh (75vh phones) with object-fit contain, edge-to-edge on phones, rendered-vector pages shown at 1× (w/2), tap → fullscreen lightbox (Esc closes).
+- Covers fall back to a generated placeholder when the image fails to load.
+- 21st.dev skill was requested, but its MCP server is not connected and its React/Tailwind components don't fit Angular; built natively instead.

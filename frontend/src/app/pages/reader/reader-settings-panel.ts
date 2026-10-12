@@ -1,19 +1,19 @@
 import { Component, inject, output } from '@angular/core';
 import { LIMITS, ReaderSettingsService, ReaderTheme } from '../../core/reader-settings.service';
 
+/** Inline "Options" panel shown under the reader's options row (like ranobes.net). */
 @Component({
   selector: 'app-reader-settings-panel',
   template: `
     @let s = settings.settings();
-    <div class="panel-pop" role="dialog" aria-label="Reading settings">
-      <div class="row">
-        <span class="label">Theme</span>
-        <div class="themes">
+    <div class="options" role="group" aria-label="Reading settings">
+      <div class="opt">
+        <span class="label">Background</span>
+        <div class="choices">
           @for (t of themes; track t.value) {
             <button
               type="button"
-              class="theme-btn"
-              [class]="'theme-btn ' + t.value"
+              [class]="'swatch ' + t.value"
               [class.active]="s.theme === t.value"
               [attr.aria-pressed]="s.theme === t.value"
               (click)="settings.update({ theme: t.value })"
@@ -24,17 +24,9 @@ import { LIMITS, ReaderSettingsService, ReaderTheme } from '../../core/reader-se
         </div>
       </div>
 
-      <div class="row">
+      <div class="opt">
         <span class="label">Font</span>
-        <div class="seg">
-          <button
-            type="button"
-            [class.active]="s.font === 'serif'"
-            (click)="settings.update({ font: 'serif' })"
-            class="serif"
-          >
-            Serif
-          </button>
+        <div class="choices">
           <button
             type="button"
             [class.active]="s.font === 'sans'"
@@ -42,12 +34,20 @@ import { LIMITS, ReaderSettingsService, ReaderTheme } from '../../core/reader-se
           >
             Sans
           </button>
+          <button
+            type="button"
+            class="serif"
+            [class.active]="s.font === 'serif'"
+            (click)="settings.update({ font: 'serif' })"
+          >
+            Serif
+          </button>
         </div>
       </div>
 
-      <div class="row">
-        <span class="label">Size</span>
-        <div class="stepper">
+      <div class="opt">
+        <span class="label">Font size</span>
+        <div class="choices">
           <button
             type="button"
             (click)="settings.step('fontSize', -1)"
@@ -68,9 +68,9 @@ import { LIMITS, ReaderSettingsService, ReaderTheme } from '../../core/reader-se
         </div>
       </div>
 
-      <div class="row">
-        <span class="label">Spacing</span>
-        <div class="stepper">
+      <div class="opt">
+        <span class="label">Line spacing</span>
+        <div class="choices">
           <button
             type="button"
             (click)="settings.step('lineHeight', -1)"
@@ -91,9 +91,9 @@ import { LIMITS, ReaderSettingsService, ReaderTheme } from '../../core/reader-se
         </div>
       </div>
 
-      <div class="row">
-        <span class="label">Width</span>
-        <div class="stepper">
+      <div class="opt">
+        <span class="label">Text width</span>
+        <div class="choices">
           <button
             type="button"
             (click)="settings.step('width', -1)"
@@ -116,53 +116,49 @@ import { LIMITS, ReaderSettingsService, ReaderTheme } from '../../core/reader-se
 
       <div class="footer">
         <button type="button" class="link" (click)="settings.reset()">Reset</button>
-        <button type="button" class="link" (click)="closed.emit()">Done</button>
+        <button type="button" class="link" (click)="closed.emit()">Close</button>
       </div>
     </div>
   `,
   styles: `
-    .panel-pop {
-      position: absolute;
-      top: calc(100% + 6px);
-      right: 12px;
-      width: 290px;
-      padding: 14px 16px;
-      border-radius: 10px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      color: var(--text);
-      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-      font-size: 14px;
-      z-index: 30;
+    .options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px 28px;
+      margin: 0 0 22px;
+      padding: 16px 18px;
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.12);
+      font-family: var(--font);
+      font-size: 12px;
     }
-    .row {
+    .opt {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      margin-bottom: 12px;
     }
     .label {
-      color: var(--text-muted);
+      color: var(--r-muted, var(--text-muted));
+      font-weight: 700;
+      text-transform: uppercase;
     }
-    .themes,
-    .seg,
-    .stepper {
+    .choices {
       display: flex;
-      gap: 6px;
       align-items: center;
+      gap: 6px;
     }
     button {
-      font: inherit;
-      cursor: pointer;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: var(--surface-2);
-      color: var(--text);
-      padding: 4px 10px;
-      min-width: 34px;
+      min-width: 36px;
       height: 30px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-radius: var(--pill);
+      background: var(--r-btn, var(--btn));
+      color: var(--r-btn-text, #efefef);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
     }
     button:disabled {
       opacity: 0.4;
@@ -170,44 +166,42 @@ import { LIMITS, ReaderSettingsService, ReaderTheme } from '../../core/reader-se
     }
     button.active {
       border-color: var(--accent);
-      color: var(--text-strong);
+      box-shadow: 0 0 0 1px var(--accent);
     }
-    .theme-btn.light {
-      background: #fbfbf8;
+    .swatch.light {
+      background: #f7f6f2;
       color: #222;
     }
-    .theme-btn.sepia {
+    .swatch.sepia {
       background: #f4ecd8;
       color: #5b4636;
     }
-    .theme-btn.dark {
-      background: #1b1d22;
+    .swatch.dark {
+      background: #474747;
       color: #ddd;
-    }
-    .theme-btn.active {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
     }
     .serif {
       font-family: Georgia, serif;
     }
     output {
-      min-width: 48px;
+      min-width: 46px;
       text-align: center;
-      color: var(--text-strong);
+      font-weight: 700;
     }
     .footer {
+      grid-column: 1 / -1;
       display: flex;
-      justify-content: space-between;
-      margin-top: 4px;
+      justify-content: flex-end;
+      gap: 18px;
     }
     .link {
-      border: 0;
-      background: none;
-      color: var(--link);
-      padding: 0;
       height: auto;
       min-width: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--accent);
+      text-transform: uppercase;
     }
   `,
 })
@@ -217,8 +211,8 @@ export class ReaderSettingsPanel {
   readonly closed = output<void>();
 
   protected readonly themes: { value: ReaderTheme; label: string }[] = [
+    { value: 'dark', label: 'Dark' },
     { value: 'light', label: 'Light' },
     { value: 'sepia', label: 'Sepia' },
-    { value: 'dark', label: 'Dark' },
   ];
 }
