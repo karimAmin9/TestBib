@@ -206,7 +206,7 @@ import { Icon } from './shared/icon';
         height: 44px;
         border: 0;
         background: none;
-        color: #2b2b2b;
+        color: var(--text);
         cursor: pointer;
       }
       .mobile-menu {

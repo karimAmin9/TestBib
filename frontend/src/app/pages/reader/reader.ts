@@ -56,207 +56,209 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
       [style]="settings.cssVars()"
     >
       <section class="main">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <a routerLink="/">Library</a><span class="sep">»</span>
-          <a [routerLink]="['/book', id()]">{{ bookTitle() || 'Book' }}</a
-          ><span class="sep">»</span>
-          <span>Page {{ n() }}</span>
-        </nav>
+        <div class="reader-col">
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a routerLink="/">Library</a><span class="sep">»</span>
+            <a [routerLink]="['/book', id()]">{{ bookTitle() || 'Book' }}</a
+            ><span class="sep">»</span>
+            <span>Page {{ n() }}</span>
+          </nav>
 
-        <div class="options-row">
-          <button
-            type="button"
-            class="link-action"
-            [attr.aria-expanded]="showSettings()"
-            aria-controls="reader-options"
-            aria-label="Reading settings"
-            (click)="showSettings.set(!showSettings())"
-          >
-            <app-icon name="gear" [size]="15" />Options
-          </button>
-          <label class="goto">
-            <span class="sr-only">Go to page</span>
-            <select [value]="n()" (change)="onSelect($event)">
-              @for (c of chapterNumbers(); track c) {
-                <option [value]="c" [selected]="c === n()">
-                  Page {{ c }} / {{ chapter()?.total }}
-                </option>
-              }
-            </select>
-          </label>
-        </div>
+          <div class="options-row">
+            <button
+              type="button"
+              class="link-action"
+              [attr.aria-expanded]="showSettings()"
+              aria-controls="reader-options"
+              aria-label="Reading settings"
+              (click)="showSettings.set(!showSettings())"
+            >
+              <app-icon name="gear" [size]="15" />Options
+            </button>
+            <label class="goto">
+              <span class="sr-only">Go to page</span>
+              <select [value]="n()" (change)="onSelect($event)">
+                @for (c of chapterNumbers(); track c) {
+                  <option [value]="c" [selected]="c === n()">
+                    Page {{ c }} / {{ chapter()?.total }}
+                  </option>
+                }
+              </select>
+            </label>
+          </div>
 
-        @if (showSettings()) {
-          <app-reader-settings-panel id="reader-options" (closed)="showSettings.set(false)" />
-        }
-
-        <nav class="nav-row" aria-label="Page navigation (top)">
-          <button
-            type="button"
-            class="btn"
-            [disabled]="!chapter()?.prev"
-            (click)="go(chapter()?.prev)"
-          >
-            « Back
-          </button>
-          <a class="btn ghost list" [routerLink]="['/book', id()]" fragment="chapters"
-            >Chapters list</a
-          >
-          <button
-            type="button"
-            class="btn"
-            [disabled]="!chapter()?.next"
-            (click)="go(chapter()?.next)"
-          >
-            Next »
-          </button>
-        </nav>
-
-        <article class="text" aria-live="polite">
-          @if (error(); as e) {
-            <div class="error-box" role="alert">{{ e }}</div>
+          @if (showSettings()) {
+            <app-reader-settings-panel id="reader-options" (closed)="showSettings.set(false)" />
           }
 
-          @if (chapter(); as c) {
-            <h1 class="chapter-title">{{ c.title }}</h1>
-            <div class="chapter-book muted">{{ bookTitle() }}</div>
-
-            @if (c.verification && c.verification.status !== 'Pass' && !noteDismissed()) {
-              <aside class="note" [class.fail]="c.verification.status === 'Fail'" role="note">
-                <button
-                  type="button"
-                  class="close"
-                  (click)="noteDismissed.set(true)"
-                  aria-label="Dismiss"
-                >
-                  ×
-                </button>
-                <strong>
-                  {{
-                    c.verification.status === 'Fail'
-                      ? 'This page does not match the PDF exactly.'
-                      : 'This page was converted with notes.'
-                  }}
-                </strong>
-                <ul>
-                  @if (c.verification.missingWords.length) {
-                    <li>Missing: {{ c.verification.missingWords.join(', ') }}</li>
-                  }
-                  @if (c.verification.extraWords.length) {
-                    <li>Extra: {{ c.verification.extraWords.join(', ') }}</li>
-                  }
-                  @if (c.verification.missingCharacters) {
-                    <li>Missing characters: {{ c.verification.missingCharacters }}</li>
-                  }
-                  @if (c.verification.orderSimilarity < 0.98) {
-                    <li>
-                      Word order differs from the PDF ({{
-                        (c.verification.orderSimilarity * 100).toFixed(0)
-                      }}% identical).
-                    </li>
-                  }
-                  @for (issue of c.verification.imageIssues; track issue) {
-                    <li>{{ issue }}</li>
-                  }
-                </ul>
-              </aside>
-            }
-
-            @for (block of c.blocks; track $index) {
-              @if (block.type === 'p') {
-                <p>{{ block.text }}</p>
-              } @else if (block.type === 'h') {
-                <h2 class="heading">{{ block.text }}</h2>
-              } @else if (block.src) {
-                @let size = sizeOf(block);
-                <figure>
-                  <button
-                    type="button"
-                    class="img-btn"
-                    (click)="zoom.set(block.src)"
-                    aria-label="Show image full screen"
-                  >
-                    <img
-                      [src]="api.imageUrl(id(), block.src)"
-                      [attr.width]="size.w"
-                      [attr.height]="size.h"
-                      loading="lazy"
-                      decoding="async"
-                      alt=""
-                    />
-                  </button>
-                </figure>
-              }
-            } @empty {
-              <p class="empty">This page is empty in the PDF.</p>
-            }
-          } @else if (!error()) {
-            <p class="empty">Loading…</p>
-          }
-        </article>
-
-        @if (chapter(); as c) {
-          <nav class="nav-row bottom-nav" aria-label="Page navigation">
-            <button type="button" class="btn" [disabled]="!c.prev" (click)="go(c.prev)">
+          <nav class="nav-row" aria-label="Page navigation (top)">
+            <button
+              type="button"
+              class="btn"
+              [disabled]="!chapter()?.prev"
+              (click)="go(chapter()?.prev)"
+            >
               « Back
             </button>
-            <span class="where">Page {{ c.number }} of {{ c.total }}</span>
-            <button type="button" class="btn" [disabled]="!c.next" (click)="go(c.next)">
+            <a class="btn list" [routerLink]="['/book', id()]" fragment="chapters">Chapters list</a>
+            <button
+              type="button"
+              class="btn"
+              [disabled]="!chapter()?.next"
+              (click)="go(chapter()?.next)"
+            >
               Next »
             </button>
           </nav>
-        }
+
+          <article class="text" aria-live="polite">
+            @if (error(); as e) {
+              <div class="error-box" role="alert">{{ e }}</div>
+            }
+
+            @if (chapter(); as c) {
+              <h1 class="chapter-title">{{ c.title }}</h1>
+              <div class="chapter-book muted">{{ bookTitle() }}</div>
+
+              @if (c.verification && c.verification.status !== 'Pass' && !noteDismissed()) {
+                <aside class="note" [class.fail]="c.verification.status === 'Fail'" role="note">
+                  <button
+                    type="button"
+                    class="close"
+                    (click)="noteDismissed.set(true)"
+                    aria-label="Dismiss"
+                  >
+                    ×
+                  </button>
+                  <strong>
+                    {{
+                      c.verification.status === 'Fail'
+                        ? 'This page does not match the PDF exactly.'
+                        : 'This page was converted with notes.'
+                    }}
+                  </strong>
+                  <ul>
+                    @if (c.verification.missingWords.length) {
+                      <li>Missing: {{ c.verification.missingWords.join(', ') }}</li>
+                    }
+                    @if (c.verification.extraWords.length) {
+                      <li>Extra: {{ c.verification.extraWords.join(', ') }}</li>
+                    }
+                    @if (c.verification.missingCharacters) {
+                      <li>Missing characters: {{ c.verification.missingCharacters }}</li>
+                    }
+                    @if (c.verification.orderSimilarity < 0.98) {
+                      <li>
+                        Word order differs from the PDF ({{
+                          (c.verification.orderSimilarity * 100).toFixed(0)
+                        }}% identical).
+                      </li>
+                    }
+                    @for (issue of c.verification.imageIssues; track issue) {
+                      <li>{{ issue }}</li>
+                    }
+                  </ul>
+                </aside>
+              }
+
+              @for (block of c.blocks; track $index) {
+                @if (block.type === 'p') {
+                  <p>{{ block.text }}</p>
+                } @else if (block.type === 'h') {
+                  <h2 class="heading">{{ block.text }}</h2>
+                } @else if (block.src) {
+                  @let size = sizeOf(block);
+                  <figure>
+                    <button
+                      type="button"
+                      class="img-btn"
+                      (click)="zoom.set(block.src)"
+                      aria-label="Show image full screen"
+                    >
+                      <img
+                        [src]="api.imageUrl(id(), block.src)"
+                        [attr.width]="size.w"
+                        [attr.height]="size.h"
+                        loading="lazy"
+                        decoding="async"
+                        alt=""
+                      />
+                    </button>
+                  </figure>
+                }
+              } @empty {
+                <p class="empty">This page is empty in the PDF.</p>
+              }
+            } @else if (!error()) {
+              <p class="empty">Loading…</p>
+            }
+          </article>
+
+          @if (chapter(); as c) {
+            <nav class="nav-row bottom-nav" aria-label="Page navigation">
+              <button type="button" class="btn" [disabled]="!c.prev" (click)="go(c.prev)">
+                « Back
+              </button>
+              <span class="where">Page {{ c.number }} of {{ c.total }}</span>
+              <button type="button" class="btn" [disabled]="!c.next" (click)="go(c.next)">
+                Next »
+              </button>
+            </nav>
+          }
+        </div>
       </section>
 
       <aside class="sidebar reader-sidebar">
-        <div class="side-block">
-          <h2 class="section-title">Nearby pages</h2>
-          <ol class="nearby">
-            @for (c of nearby(); track c.number) {
-              <li>
-                <a
-                  [routerLink]="['/book', id(), 'read', c.number]"
-                  [class.current]="c.number === n()"
-                >
-                  <span>{{ c.title }}</span>
-                  @if (c.verification === 'Warning' || c.verification === 'Fail') {
-                    <span
-                      class="flag"
-                      [class.bad]="c.verification === 'Fail'"
-                      title="Differs from the PDF"
-                      >⚠</span
-                    >
-                  }
-                </a>
-              </li>
-            }
-          </ol>
-        </div>
-        @if (chapter(); as c) {
+        <div class="sticky">
           <div class="side-block">
-            <h2 class="section-title">This page</h2>
-            <div class="stat-row">
-              <span>Read in this book</span><span class="muted">{{ bookPercent() }}%</span>
-              <span class="bar ok"><span [style.width.%]="bookPercent()"></span></span>
-            </div>
-            <p class="small muted">
-              @switch (c.verification?.status) {
-                @case ('Pass') {
-                  ✓ Text and images verified 1:1 against the PDF.
-                }
-                @case ('Warning') {
-                  ⚠ All text present; order or word splitting differs.
-                }
-                @case ('Fail') {
-                  ⚠ This page differs from the PDF (details above the text).
-                }
-                @default {
-                  Not verified.
-                }
+            <h2 class="section-title">Nearby pages</h2>
+            <ol class="nearby">
+              @for (c of nearby(); track c.number) {
+                <li>
+                  <a
+                    [routerLink]="['/book', id(), 'read', c.number]"
+                    [class.current]="c.number === n()"
+                  >
+                    <span>{{ c.title }}</span>
+                    @if (c.verification === 'Warning' || c.verification === 'Fail') {
+                      <span
+                        class="flag"
+                        [class.bad]="c.verification === 'Fail'"
+                        title="Differs from the PDF"
+                        >⚠</span
+                      >
+                    }
+                  </a>
+                </li>
               }
-            </p>
+            </ol>
           </div>
-        }
+          @if (chapter(); as c) {
+            <div class="side-block">
+              <h2 class="section-title">This page</h2>
+              <div class="stat-row">
+                <span>Read in this book</span><span class="muted">{{ bookPercent() }}%</span>
+                <span class="bar ok"><span [style.width.%]="bookPercent()"></span></span>
+              </div>
+              <p class="small muted">
+                @switch (c.verification?.status) {
+                  @case ('Pass') {
+                    ✓ Text and images verified 1:1 against the PDF.
+                  }
+                  @case ('Warning') {
+                    ⚠ All text present; order or word splitting differs.
+                  }
+                  @case ('Fail') {
+                    ⚠ This page differs from the PDF (details above the text).
+                  }
+                  @default {
+                    Not verified.
+                  }
+                }
+              </p>
+            </div>
+          }
+        </div>
       </aside>
     </div>
 

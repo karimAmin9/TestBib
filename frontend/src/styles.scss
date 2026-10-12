@@ -82,11 +82,11 @@ h3 {
 /** The single rounded content panel every page sits in. */
 .page {
   max-width: var(--page-width);
-  margin: 16px auto 32px;
+  margin: 16px auto;
   background: var(--panel);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  min-height: calc(100vh - 48px);
+  min-height: calc(100vh - 32px);
 }
 
 /** Main column + right sidebar, separated by a hairline like ranobes. */
@@ -104,11 +104,21 @@ h3 {
     padding: 24px 22px;
     min-width: 0;
   }
+
+  // Sidebar content follows the reader while the main column scrolls.
+  > .sidebar > .sticky {
+    position: sticky;
+    top: 24px;
+  }
 }
 
 @media (max-width: 1080px) {
   .with-sidebar {
     grid-template-columns: minmax(0, 1fr);
+
+    > .sidebar > .sticky {
+      position: static;
+    }
 
     > .sidebar {
       border-left: 0;
@@ -132,6 +142,20 @@ h3 {
 }
 
 /* ---------- Typography helpers ---------- */
+
+/** Page header row: title left, meta right; same height as the sidebar tabs (36px). */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  margin-bottom: 16px;
+
+  .section-title {
+    margin: 0;
+  }
+}
 
 .section-title {
   margin: 0 0 14px;
@@ -263,8 +287,10 @@ h3 {
   font-weight: 700;
   text-transform: uppercase;
   white-space: nowrap;
+  line-height: 18px;
 
-  &::before {
+  // Leading dot, like ranobes' "• UP: 7 DAYS AGO". Pills that carry their own icon omit it.
+  &.dot::before {
     content: '';
     width: 4px;
     height: 4px;
@@ -456,4 +482,32 @@ h3 {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/** Big-number tiles for plain counts (bars are reserved for proportions). */
+.stat-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-tile {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.14);
+
+  strong {
+    display: block;
+    color: var(--text-strong);
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
 }

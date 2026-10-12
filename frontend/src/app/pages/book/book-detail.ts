@@ -1,5 +1,16 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -102,7 +113,7 @@ export const CHAPTERS_PER_PAGE = 100;
                     [pagesWithIssues]="b.pagesWithIssues"
                   />
                 }
-                <span class="pill">Added: {{ b.createdAt | timeAgo }}</span>
+                <span class="pill dot added">Added {{ b.createdAt | timeAgo }}</span>
               </div>
 
               @if (editing()) {
@@ -153,7 +164,7 @@ export const CHAPTERS_PER_PAGE = 100;
                         <span class="ch-title">
                           {{ c.title }}
                           @if (b.progress?.chapterNumber === c.number) {
-                            <span class="pill">Reading</span>
+                            <span class="pill dot">Reading</span>
                           }
                         </span>
                         <span
@@ -212,62 +223,64 @@ export const CHAPTERS_PER_PAGE = 100;
       </section>
 
       <aside class="sidebar">
-        @if (detail(); as d) {
-          @let b = d.book;
-          @if (b.status === 'Ready') {
-            <div class="side-block">
-              <h2 class="section-title">Conversion check</h2>
-              <div class="score">
-                <span class="score-value">{{ verifiedPercent() }}%</span>
-                <span class="muted small"
-                  >of {{ d.chapters.length }} pages<br />match the PDF 1:1</span
-                >
+        <div class="sticky">
+          @if (detail(); as d) {
+            @let b = d.book;
+            @if (b.status === 'Ready') {
+              <div class="side-block">
+                <h2 class="section-title">Conversion check</h2>
+                <div class="score">
+                  <span class="score-value">{{ verifiedPercent() }}%</span>
+                  <span class="muted small"
+                    >of {{ d.chapters.length }} pages<br />match the PDF 1:1</span
+                  >
+                </div>
+                <div class="stat-row">
+                  <span>✓ Verified</span><span class="muted">{{ counts().pass }}</span>
+                  <span class="bar ok"><span [style.width.%]="share(counts().pass)"></span></span>
+                </div>
+                <div class="stat-row">
+                  <span>⚠ With notes</span><span class="muted">{{ counts().warn }}</span>
+                  <span class="bar warn"><span [style.width.%]="share(counts().warn)"></span></span>
+                </div>
+                <div class="stat-row">
+                  <span>⚠ Differ</span><span class="muted">{{ counts().fail }}</span>
+                  <span class="bar bad"><span [style.width.%]="share(counts().fail)"></span></span>
+                </div>
+                <p class="muted small hint">
+                  Every page is compared with the original PDF: all characters, words, word order
+                  and images.
+                </p>
               </div>
-              <div class="stat-row">
-                <span>✓ Verified</span><span class="muted">{{ counts().pass }}</span>
-                <span class="bar ok"><span [style.width.%]="share(counts().pass)"></span></span>
+
+              <div class="side-block">
+                <h2 class="section-title">Your progress</h2>
+                <div class="stat-row">
+                  <span>Page {{ b.progress?.chapterNumber ?? 0 }} of {{ b.pageCount }}</span>
+                  <span class="muted">{{ readPercent() }}%</span>
+                  <span class="bar ok"><span [style.width.%]="readPercent()"></span></span>
+                </div>
+                @if (b.progress; as p) {
+                  <p class="muted small">Last read {{ p.updatedAt | timeAgo }}</p>
+                }
               </div>
-              <div class="stat-row">
-                <span>⚠ With notes</span><span class="muted">{{ counts().warn }}</span>
-                <span class="bar warn"><span [style.width.%]="share(counts().warn)"></span></span>
-              </div>
-              <div class="stat-row">
-                <span>⚠ Differ</span><span class="muted">{{ counts().fail }}</span>
-                <span class="bar bad"><span [style.width.%]="share(counts().fail)"></span></span>
-              </div>
-              <p class="muted small hint">
-                Every page is compared with the original PDF: all characters, words, word order and
-                images.
-              </p>
-            </div>
+            }
 
             <div class="side-block">
-              <h2 class="section-title">Your progress</h2>
-              <div class="stat-row">
-                <span>Page {{ b.progress?.chapterNumber ?? 0 }} of {{ b.pageCount }}</span>
-                <span class="muted">{{ readPercent() }}%</span>
-                <span class="bar ok"><span [style.width.%]="readPercent()"></span></span>
+              <h2 class="section-title">Manage</h2>
+              <div class="manage">
+                @if (!editing()) {
+                  <button type="button" class="link-action" (click)="startEdit()">
+                    <app-icon name="edit" [size]="14" />Edit details
+                  </button>
+                }
+                <button type="button" class="link-action danger" (click)="remove()">
+                  <app-icon name="trash" [size]="14" />Delete book
+                </button>
               </div>
-              @if (b.progress; as p) {
-                <p class="muted small">Last read {{ p.updatedAt | timeAgo }}</p>
-              }
             </div>
           }
-
-          <div class="side-block">
-            <h2 class="section-title">Manage</h2>
-            <div class="manage">
-              @if (!editing()) {
-                <button type="button" class="link-action" (click)="startEdit()">
-                  <app-icon name="edit" [size]="14" />Edit details
-                </button>
-              }
-              <button type="button" class="link-action danger" (click)="remove()">
-                <app-icon name="trash" [size]="14" />Delete book
-              </button>
-            </div>
-          </div>
-        }
+        </div>
       </aside>
     </div>
   `,
@@ -292,7 +305,7 @@ export const CHAPTERS_PER_PAGE = 100;
       margin-bottom: 4px;
     }
     .facts {
-      margin: 22px 4px 0;
+      margin: 20px 0 0;
       font-size: 12px;
     }
     .facts div {
@@ -364,6 +377,7 @@ export const CHAPTERS_PER_PAGE = 100;
       scroll-margin-top: 80px;
     }
     .chapter-list {
+      position: relative;
       list-style: none;
       margin: 0;
       padding: 0 12px 0 0;
@@ -480,6 +494,8 @@ export const CHAPTERS_PER_PAGE = 100;
 export class BookDetailPage {
   protected readonly api = inject(BooksApi);
   private readonly router = inject(Router);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private pollTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** Route param. */
@@ -539,6 +555,7 @@ export class BookDetailPage {
     try {
       const detail = await firstValueFrom(this.api.get(id));
       this.detail.set(detail);
+      afterNextRender(() => this.scrollToCurrentChapter(), { injector: this.injector });
       const current = detail.book.progress?.chapterNumber;
       if (current) {
         this.chapterPage.set(Math.ceil(current / CHAPTERS_PER_PAGE));
@@ -548,6 +565,15 @@ export class BookDetailPage {
       }
     } catch (e) {
       this.error.set(errorMessages(e)[0]!);
+    }
+  }
+
+  /** Scrolls the chapter list (not the page) so the page being read is visible. */
+  private scrollToCurrentChapter(): void {
+    const list = this.host.nativeElement.querySelector<HTMLElement>('.chapter-list');
+    const current = list?.querySelector<HTMLElement>('a.current');
+    if (list && current && list.scrollHeight > list.clientHeight) {
+      list.scrollTop = current.offsetTop - list.clientHeight / 3;
     }
   }
 

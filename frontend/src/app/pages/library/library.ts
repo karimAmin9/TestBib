@@ -26,7 +26,7 @@ type SideTab = 'continue' | 'recent';
   template: `
     <div class="page with-sidebar">
       <section class="main">
-        <div class="head">
+        <div class="page-head">
           <h1 class="section-title">My library</h1>
           @if (loaded()) {
             <span class="muted small"
@@ -54,7 +54,7 @@ type SideTab = 'continue' | 'recent';
             (change)="onPick($event)"
             [disabled]="!!upload()"
           />
-          <span class="upload-icon"><app-icon name="upload" [size]="22" /></span>
+          <span class="upload-icon"><app-icon name="upload" [size]="18" /></span>
           @if (upload(); as u) {
             <span class="upload-text">
               <strong>Uploading {{ u.name }}</strong>
@@ -82,95 +82,97 @@ type SideTab = 'continue' | 'recent';
       </section>
 
       <aside class="sidebar">
-        <div class="side-block">
-          <div class="tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              [class.active]="tab() === 'continue'"
-              [attr.aria-selected]="tab() === 'continue'"
-              (click)="tab.set('continue')"
-            >
-              Continue
-            </button>
-            <button
-              type="button"
-              role="tab"
-              [class.active]="tab() === 'recent'"
-              [attr.aria-selected]="tab() === 'recent'"
-              (click)="tab.set('recent')"
-            >
-              Recently added
-            </button>
-          </div>
+        <div class="sticky">
+          <div class="side-block">
+            <div class="tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                [class.active]="tab() === 'continue'"
+                [attr.aria-selected]="tab() === 'continue'"
+                (click)="tab.set('continue')"
+              >
+                Continue
+              </button>
+              <button
+                type="button"
+                role="tab"
+                [class.active]="tab() === 'recent'"
+                [attr.aria-selected]="tab() === 'recent'"
+                (click)="tab.set('recent')"
+              >
+                Recently added
+              </button>
+            </div>
 
-          @for (b of sideList(); track b.id) {
-            <a
-              class="thumb-row"
-              [routerLink]="
-                b.progress && tab() === 'continue'
-                  ? ['/book', b.id, 'read', b.progress.chapterNumber]
-                  : ['/book', b.id]
-              "
-            >
-              <app-book-cover class="thumb" [book]="b" />
-              <span>
-                <span class="thumb-title" [title]="b.title">{{ b.title }}</span>
-                <span class="thumb-meta">
-                  @if (tab() === 'continue' && b.progress) {
-                    Page {{ b.progress.chapterNumber }} of {{ b.pageCount }} ·
-                    {{ b.progress.updatedAt | timeAgo }}
-                  } @else {
-                    {{ b.pageCount ? b.pageCount + ' pages · ' : '' }}{{ b.createdAt | timeAgo }}
-                  }
+            @for (b of sideList(); track b.id) {
+              <a
+                class="thumb-row"
+                [routerLink]="
+                  b.progress && tab() === 'continue'
+                    ? ['/book', b.id, 'read', b.progress.chapterNumber]
+                    : ['/book', b.id]
+                "
+              >
+                <app-book-cover class="thumb" [book]="b" />
+                <span>
+                  <span class="thumb-title" [title]="b.title">{{ b.title }}</span>
+                  <span class="thumb-meta">
+                    @if (tab() === 'continue' && b.progress) {
+                      Page {{ b.progress.chapterNumber }} of {{ b.pageCount }} ·
+                      {{ b.progress.updatedAt | timeAgo }}
+                    } @else {
+                      {{ b.pageCount ? b.pageCount + ' pages · ' : '' }}{{ b.createdAt | timeAgo }}
+                    }
+                  </span>
                 </span>
-              </span>
-            </a>
-          } @empty {
-            <p class="muted small">
-              {{ tab() === 'continue' ? 'Books you start reading show up here.' : 'No books yet.' }}
-            </p>
-          }
-        </div>
+              </a>
+            } @empty {
+              <p class="muted small">
+                {{
+                  tab() === 'continue' ? 'Books you start reading show up here.' : 'No books yet.'
+                }}
+              </p>
+            }
+          </div>
 
-        <div class="side-block">
-          <h2 class="section-title">Library statistics</h2>
-          <div class="stat-row">
-            <span>Books</span><strong>{{ books().length }}</strong>
-          </div>
-          <div class="stat-row">
-            <span>Pages</span><strong>{{ totalPages() }}</strong>
-          </div>
-          <div class="stat-row">
-            <span>Verified 1:1</span><strong>{{ verified() }} / {{ readyCount() }}</strong>
-            <span class="bar ok"
-              ><span [style.width.%]="readyCount() ? (100 * verified()) / readyCount() : 0"></span
-            ></span>
-          </div>
-          <div class="stat-row">
-            <span>Started reading</span><strong>{{ started() }} / {{ readyCount() }}</strong>
-            <span class="bar"
-              ><span [style.width.%]="readyCount() ? (100 * started()) / readyCount() : 0"></span
-            ></span>
+          <div class="side-block">
+            <h2 class="section-title">Library statistics</h2>
+            <div class="stat-tiles">
+              <div class="stat-tile">
+                <strong>{{ books().length }}</strong
+                ><span>Books</span>
+              </div>
+              <div class="stat-tile">
+                <strong>{{ totalPages() }}</strong
+                ><span>Pages</span>
+              </div>
+            </div>
+            <div class="stat-row">
+              <span>Verified 1:1</span><strong>{{ verified() }} / {{ readyCount() }}</strong>
+              <span class="bar ok"
+                ><span [style.width.%]="readyCount() ? (100 * verified()) / readyCount() : 0"></span
+              ></span>
+            </div>
+            <div class="stat-row">
+              <span>Started reading</span><strong>{{ started() }} / {{ readyCount() }}</strong>
+              <span class="bar"
+                ><span [style.width.%]="readyCount() ? (100 * started()) / readyCount() : 0"></span
+              ></span>
+            </div>
           </div>
         </div>
       </aside>
     </div>
   `,
   styles: `
-    .head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-    }
     .upload {
       display: flex;
       align-items: center;
       gap: 16px;
-      padding: 16px 18px;
-      margin-bottom: 6px;
-      border: 2px dashed var(--border);
+      padding: 10px 12px 10px 10px;
+      margin-bottom: 4px;
+      border: 1px dashed var(--border);
       border-radius: var(--radius);
       background: rgba(0, 0, 0, 0.08);
       cursor: pointer;
@@ -190,8 +192,8 @@ type SideTab = 'continue' | 'recent';
       display: grid;
       place-items: center;
       flex: 0 0 auto;
-      width: 44px;
-      height: 44px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       background: var(--accent);
       color: #2f3a24;
@@ -235,6 +237,9 @@ type SideTab = 'continue' | 'recent';
     }
     @media (max-width: 480px) {
       .upload-cta.btn {
+        display: none;
+      }
+      .upload-text .small {
         display: none;
       }
     }

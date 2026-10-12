@@ -24,6 +24,9 @@ import { VerificationBadge } from '../../shared/verification-badge';
         <h2 class="title">
           <a [routerLink]="['/book', b.id]">{{ b.title }}</a>
         </h2>
+        @if (byline(); as line) {
+          <div class="byline">{{ line }}</div>
+        }
         <div class="meta">
           @switch (b.status) {
             @case ('Ready') {
@@ -39,13 +42,7 @@ import { VerificationBadge } from '../../shared/verification-badge';
               <span class="pill bad">Conversion failed</span>
             }
           }
-          <span class="pill">Added: {{ b.createdAt | timeAgo }}</span>
-        </div>
-        <div class="byline">
-          {{ b.author ?? 'Unknown author' }}
-          @if (b.status === 'Ready') {
-            <span class="dot">·</span>{{ b.pageCount }} pages
-          }
+          <span class="pill dot added">Added {{ b.createdAt | timeAgo }}</span>
         </div>
 
         @if (b.status === 'Failed') {
@@ -147,19 +144,16 @@ import { VerificationBadge } from '../../shared/verification-badge';
       color: var(--text-strong);
       text-decoration: none;
     }
-    .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px 10px;
-      margin-bottom: 8px;
-    }
     .byline {
-      margin-bottom: 10px;
+      margin: -2px 0 10px;
       color: var(--text-muted);
       font-size: 12px;
     }
-    .dot {
-      margin: 0 6px;
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 8px;
+      margin-bottom: 12px;
     }
     .excerpt {
       margin: 0;
@@ -227,10 +221,11 @@ import { VerificationBadge } from '../../shared/verification-badge';
       }
       .actions {
         clear: both;
-        position: relative;
-        top: 12px;
-        margin-bottom: 12px;
+        margin-top: 14px;
         padding-right: 16px;
+      }
+      .added {
+        display: none;
       }
       .read {
         min-width: 116px;
@@ -257,6 +252,13 @@ export class BookCard {
   protected readonly readQuery = computed(() => {
     const p = this.book().progress;
     return p ? { pos: p.scrollPercent } : {};
+  });
+
+  /** "Author · 315 pages", leaving out what is unknown. */
+  protected readonly byline = computed(() => {
+    const b = this.book();
+    const parts = [b.author, b.status === 'Ready' ? `${b.pageCount} pages` : null].filter(Boolean);
+    return parts.join(' · ');
   });
 
   protected readonly progressPercent = computed(() => {
