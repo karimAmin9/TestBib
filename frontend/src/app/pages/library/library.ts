@@ -1,13 +1,10 @@
 import { HttpEventType } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { errorMessages } from '../../core/auth.service';
 import { BooksApi } from '../../core/books.api';
 import { BookSummary } from '../../core/models';
-import { BookCover } from '../../shared/book-cover';
 import { Icon } from '../../shared/icon';
-import { TimeAgoPipe } from '../../shared/time-ago';
 import { BookCard } from './book-card';
 
 export const POLL_INTERVAL_MS = 2000;
@@ -18,11 +15,9 @@ interface Upload {
   percent: number;
 }
 
-type SideTab = 'continue' | 'recent';
-
 @Component({
   selector: 'app-library',
-  imports: [BookCard, BookCover, Icon, RouterLink, TimeAgoPipe],
+  imports: [BookCard, Icon],
   template: `
     <div class="page with-sidebar">
       <section class="main">
@@ -84,60 +79,7 @@ type SideTab = 'continue' | 'recent';
       <aside class="sidebar">
         <div class="sticky">
           <div class="side-block">
-            <div class="tabs" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                [class.active]="tab() === 'continue'"
-                [attr.aria-selected]="tab() === 'continue'"
-                (click)="tab.set('continue')"
-              >
-                Continue
-              </button>
-              <button
-                type="button"
-                role="tab"
-                [class.active]="tab() === 'recent'"
-                [attr.aria-selected]="tab() === 'recent'"
-                (click)="tab.set('recent')"
-              >
-                Recently added
-              </button>
-            </div>
-
-            @for (b of sideList(); track b.id) {
-              <a
-                class="thumb-row"
-                [routerLink]="
-                  b.progress && tab() === 'continue'
-                    ? ['/book', b.id, 'read', b.progress.chapterNumber]
-                    : ['/book', b.id]
-                "
-              >
-                <app-book-cover class="thumb" [book]="b" />
-                <span>
-                  <span class="thumb-title" [title]="b.title">{{ b.title }}</span>
-                  <span class="thumb-meta">
-                    @if (tab() === 'continue' && b.progress) {
-                      Page {{ b.progress.chapterNumber }} of {{ b.pageCount }} ·
-                      {{ b.progress.updatedAt | timeAgo }}
-                    } @else {
-                      {{ b.pageCount ? b.pageCount + ' pages · ' : '' }}{{ b.createdAt | timeAgo }}
-                    }
-                  </span>
-                </span>
-              </a>
-            } @empty {
-              <p class="muted small">
-                {{
-                  tab() === 'continue' ? 'Books you start reading show up here.' : 'No books yet.'
-                }}
-              </p>
-            }
-          </div>
-
-          <div class="side-block">
-            <h2 class="section-title">Library statistics</h2>
+            <div class="page-head"><h2 class="section-title">Library statistics</h2></div>
             <div class="stat-tiles">
               <div class="stat-tile">
                 <strong>{{ books().length }}</strong
@@ -230,11 +172,6 @@ type SideTab = 'continue' | 'recent';
     .empty {
       margin-top: 24px;
     }
-    .thumb-row > span {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-    }
     @media (max-width: 480px) {
       .upload-cta.btn {
         display: none;
@@ -254,7 +191,6 @@ export class Library implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly upload = signal<Upload | null>(null);
   protected readonly dragging = signal(false);
-  protected readonly tab = signal<SideTab>('continue');
   protected readonly hasProcessing = computed(() =>
     this.books().some((b) => b.status === 'Processing'),
   );
@@ -269,17 +205,6 @@ export class Library implements OnInit {
   protected readonly totalPages = computed(() =>
     this.books().reduce((sum, b) => sum + b.pageCount, 0),
   );
-
-  protected readonly sideList = computed(() => {
-    const books = this.books();
-    if (this.tab() === 'continue') {
-      return books
-        .filter((b) => b.progress)
-        .sort((a, b) => b.progress!.updatedAt.localeCompare(a.progress!.updatedAt))
-        .slice(0, 8);
-    }
-    return books.slice(0, 8);
-  });
 
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.pollTimer));
