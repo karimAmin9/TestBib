@@ -1,0 +1,5 @@
+**/bin
+**/obj
+**/data
+**/TestResults
+Bib.Api.Tests
