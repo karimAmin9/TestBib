@@ -295,10 +295,10 @@ public sealed class PdfProcessor(IPageRenderer renderer)
             }
             else
             {
-                block = RenderToFile(pdf, page, image.Bounds, imageDir, ImageFileName(page.Number, index, "png"));
+                block = RenderToFile(pdf, page, image.BoundingBox, imageDir, ImageFileName(page.Number, index, "png"));
             }
 
-            result.Add((image.Bounds.Top, image.Bounds.Left, block));
+            result.Add((image.BoundingBox.Top, image.BoundingBox.Left, block));
         }
 
         return result;

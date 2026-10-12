@@ -1,0 +1,43 @@
+# Development: `docker compose up -d postgres`, then run the API and the Angular dev server locally.
+# Full stack:  `docker compose --profile full up -d --build`  (http://localhost:8080)
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: bib
+      POSTGRES_USER: bib
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bib_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bib -d bib"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    build: ./backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=bib;Username=bib;Password=${POSTGRES_PASSWORD:-bib_dev_password}
+      Storage__Root: /data
+    volumes:
+      - bookdata:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    profiles: ["full"]
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  bookdata:
