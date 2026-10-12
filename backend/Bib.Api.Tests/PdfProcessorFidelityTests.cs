@@ -169,6 +169,23 @@ public sealed class PdfProcessorFidelityTests : IDisposable
     }
 
     [Fact]
+    public void Large_short_lines_become_headings()
+    {
+        var pdf = new FixturePdf()
+            .Page(p => p
+                .Text("A Quiet Harbour", FixturePage.Left, 790, size: 20)
+                .Paragraph("The boats came home before dark.", "Nobody spoke on the pier."))
+            .Build();
+
+        var book = _h.Process(pdf);
+        var chapter = book.Chapters[0];
+
+        Assert.Equal("h,p", ConversionHarness.Shape(chapter));
+        Assert.Equal("A Quiet Harbour", chapter.Blocks[0].Text);
+        AssertVerified(pdf, book);
+    }
+
+    [Fact]
     public void Numbers_inside_the_text_body_are_kept()
     {
         var pdf = new FixturePdf()

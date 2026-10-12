@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using Bib.Api.Books;
 using Bib.Api.Conversion;
 using Bib.Api.Tests.Fixtures;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 
 namespace Bib.Api.Tests.Integration;
 
@@ -185,6 +187,34 @@ public sealed class BooksApiTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/books/{book.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/books/{book.Id}")).StatusCode);
         Assert.False(Directory.Exists(bookDir));
+    }
+
+    [Fact]
+    public async Task Login_attempts_are_rate_limited()
+    {
+        using var limited = factory.WithWebHostBuilder(b => b.UseSetting("RateLimits:AuthPerMinute", "3"));
+        var client = limited.CreateClient();
+        var body = new { email = "nobody@example.test", password = "Wrong-pass1" };
+
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 5; i++)
+        {
+            statuses.Add((await client.PostAsJsonAsync("/api/auth/login?useCookies=true", body)).StatusCode);
+        }
+
+        Assert.Equal([HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized], statuses.Take(3));
+        Assert.All(statuses.Skip(3), s => Assert.Equal(HttpStatusCode.TooManyRequests, s));
+    }
+
+    [Fact]
+    public async Task Responses_forbid_content_sniffing()
+    {
+        var client = await factory.CreateUserClientAsync();
+        var book = await client.UploadAndWaitAsync(SamplePdf());
+
+        var image = await client.GetAsync($"/api/books/{book.Id}/cover");
+
+        Assert.Equal("nosniff", string.Join("", image.Headers.GetValues("X-Content-Type-Options")));
     }
 
     [Fact]

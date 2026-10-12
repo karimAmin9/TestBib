@@ -56,6 +56,9 @@ public sealed class CorpusTests : IDisposable
         Assert.Contains(paragraphs, p => p.Contains("Sie hieß Jördis, kam angeblich aus Größenwald"));
         Assert.Contains(paragraphs, p => p.StartsWith("„Ich suche jemanden\"", StringComparison.Ordinal) || p.Contains("„Ich suche jemanden\""));
         Assert.True(book.Chapters.Count >= 3, "each chapter heading starts a new page");
+
+        var headings = book.Chapters.SelectMany(c => c.Blocks).Where(b => b.Type == BlockTypes.Heading).Select(b => b.Text).ToList();
+        Assert.Equal(["Chapter One: The Lighthouse Keeper", "Chapter Two: Über den Nebel", "Chapter Three: The Map"], headings);
     }
 
     [Fact]

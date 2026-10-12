@@ -13,6 +13,7 @@ function chapter(overrides: Partial<Chapter> = {}): Chapter {
     prev: 1,
     next: 3,
     blocks: [
+      { type: 'h', text: 'Chapter Two' },
       { type: 'p', text: 'First paragraph.' },
       { type: 'img', src: 'p2-1.jpg', w: 64, h: 48 },
       { type: 'p', text: 'Second paragraph.' },
@@ -72,9 +73,10 @@ describe('Reader', () => {
   it('renders paragraphs and images in order', async () => {
     const f = await open();
 
-    const blocks = Array.from(el(f).querySelectorAll('article > p, article > figure'));
-    expect(blocks.map((b) => b.tagName)).toEqual(['P', 'FIGURE', 'P']);
-    expect(blocks[0]!.textContent).toBe('First paragraph.');
+    const blocks = Array.from(el(f).querySelectorAll('article > p, article > h2, article > figure'));
+    expect(blocks.map((b) => b.tagName)).toEqual(['H2', 'P', 'FIGURE', 'P']);
+    expect(blocks[0]!.textContent).toBe('Chapter Two');
+    expect(blocks[1]!.textContent).toBe('First paragraph.');
     const img = el(f).querySelector('figure img') as HTMLImageElement;
     expect(img.getAttribute('src')).toBe('/api/books/b1/images/p2-1.jpg');
     expect(img.getAttribute('width')).toBe('64');

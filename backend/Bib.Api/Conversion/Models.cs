@@ -6,7 +6,10 @@ namespace Bib.Api.Conversion;
 public static class BlockTypes
 {
     public const string Paragraph = "p";
+    public const string Heading = "h";
     public const string Image = "img";
+
+    public static bool IsText(string type) => type is Paragraph or Heading;
 }
 
 /// <summary>One unit of chapter content: a paragraph of text or an image.</summary>
@@ -28,6 +31,8 @@ public sealed record ContentBlock
     public bool? Rendered { get; init; }
 
     public static ContentBlock Paragraph(string text) => new() { Type = BlockTypes.Paragraph, Text = text };
+
+    public static ContentBlock Heading(string text) => new() { Type = BlockTypes.Heading, Text = text };
 }
 
 public static class RemovalKinds

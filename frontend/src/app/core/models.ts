@@ -39,7 +39,7 @@ export interface BookDetail {
 }
 
 export interface ContentBlock {
-  type: 'p' | 'img';
+  type: 'p' | 'h' | 'img';
   text?: string;
   src?: string;
   w?: number;

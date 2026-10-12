@@ -26,7 +26,7 @@ public sealed class ConversionHarness : IDisposable
     public byte[] ReadImage(string src) => File.ReadAllBytes(Path.Combine(ImageDir, src));
 
     public static IReadOnlyList<string> Paragraphs(ProcessedChapter chapter) =>
-        chapter.Blocks.Where(b => b.Type == BlockTypes.Paragraph).Select(b => b.Text!).ToList();
+        chapter.Blocks.Where(b => BlockTypes.IsText(b.Type)).Select(b => b.Text!).ToList();
 
     public static IReadOnlyList<string> Words(ProcessedChapter chapter) =>
         Paragraphs(chapter).SelectMany(TextNormalizer.Words).ToList();

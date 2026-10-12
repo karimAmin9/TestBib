@@ -1,0 +1,12 @@
+# pdf-reader: security decisions
+- Cookie auth (ADR-002); ownership filter on every query; 404 for other users' resources.
+- Rate limits: auth 20/min per IP, uploads 30/h per user (configurable via `RateLimits:*`).
+- Untrusted PDF parsing is isolated to the background worker, capped at 5,000 pages, and runs in a non-root container.
+- `nosniff` on all API responses; CSP, frame and referrer headers set in nginx.
+- Open items before going public:
+  - a strong DB password
+  - TLS
+  - no direct exposure of the API container
+  - container resource limits
+  - email verification, or closed registration
+- Review: `.10x/reviews/2026-10-12-security-review.md`

@@ -10,7 +10,7 @@ public static class AuthEndpoints
 {
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        var auth = app.MapGroup("/api/auth");
+        var auth = app.MapGroup("/api/auth").RequireRateLimiting(RateLimits.Auth);
 
         // POST /register, POST /login?useCookies=true, ... (ASP.NET Core Identity API endpoints)
         auth.MapIdentityApi<AppUser>();

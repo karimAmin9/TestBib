@@ -20,6 +20,7 @@ public static class BookEndpoints
         books.MapGet("/", ListAsync);
         books.MapPost("/", UploadAsync)
             .DisableAntiforgery() // cookie is SameSite=Strict; see ADR-002
+            .RequireRateLimiting(RateLimits.Upload)
             .WithMetadata(new RequestSizeLimitAttribute(MaxUploadBytes + 1024 * 1024))
             .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaxUploadBytes + 1024 * 1024 });
         books.MapGet("/{id:guid}", GetAsync);

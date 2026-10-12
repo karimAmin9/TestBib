@@ -35,6 +35,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Default", _postgres.GetConnectionString());
         builder.UseSetting("Storage:Root", StorageRoot);
+        builder.UseSetting("RateLimits:AuthPerMinute", "100000");
     }
 
     /// <summary>A client with its own cookie jar, registered and logged in as a fresh user.</summary>

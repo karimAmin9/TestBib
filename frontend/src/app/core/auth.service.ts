@@ -56,6 +56,9 @@ export function errorMessages(error: unknown): string[] {
   if (error.status === 401) {
     return ['Email or password is incorrect.'];
   }
+  if (error.status === 404) {
+    return ['This book was not found. It may have been deleted.'];
+  }
   const body = error.error as {
     detail?: string;
     title?: string;

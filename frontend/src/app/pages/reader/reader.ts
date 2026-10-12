@@ -138,6 +138,8 @@ function optionalNumber(value: unknown): number | undefined {
           @for (block of c.blocks; track $index) {
             @if (block.type === 'p') {
               <p>{{ block.text }}</p>
+            } @else if (block.type === 'h') {
+              <h2 class="heading">{{ block.text }}</h2>
             } @else if (block.src) {
               <figure>
                 <img

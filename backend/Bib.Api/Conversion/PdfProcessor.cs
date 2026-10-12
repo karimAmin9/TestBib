@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
@@ -15,12 +17,15 @@ namespace Bib.Api.Conversion;
 /// Everything it intentionally drops is recorded as a <see cref="Removal"/> so the
 /// <see cref="ConversionVerifier"/> can prove nothing else was lost.
 /// </summary>
-public sealed class PdfProcessor(IPageRenderer renderer)
+public sealed partial class PdfProcessor(IPageRenderer renderer)
 {
     /// <summary>Scale used when an image has to be rendered from the page (2.0 = 144 dpi).</summary>
     public const double FallbackRenderScale = 2.0;
 
     public const int CoverWidth = 360;
+
+    /// <summary>Upper bound for untrusted input; protects the worker from pathological files.</summary>
+    public const int MaxPages = 5000;
 
     /// <summary>Fraction of the page height at top and bottom where page numbers are expected.</summary>
     private const double MarginFraction = 0.1;
@@ -36,6 +41,11 @@ public sealed class PdfProcessor(IPageRenderer renderer)
         Directory.CreateDirectory(imageDir);
 
         using var doc = Open(pdf);
+        if (doc.NumberOfPages > MaxPages)
+        {
+            throw new PdfProcessingException($"This PDF has {doc.NumberOfPages} pages; the maximum is {MaxPages}.");
+        }
+
         var chapters = new List<ProcessedChapter>(doc.NumberOfPages);
         for (var n = 1; n <= doc.NumberOfPages; n++)
         {
@@ -119,6 +129,7 @@ public sealed class PdfProcessor(IPageRenderer renderer)
 
         var orphans = words.Where(w => !used.Contains(w)).ToList();
 
+        var bodySize = DominantFontSize(words);
         foreach (var paragraph in MergeContinuations(ordered).SelectMany(SplitParagraphs))
         {
             var lines = paragraph.Select(l => string.Join(' ', l.Words.Select(w => w.Text.Trim()))).ToList();
@@ -141,7 +152,7 @@ public sealed class PdfProcessor(IPageRenderer renderer)
             }
 
             removed.AddRange(blockRemovals);
-            result.Add((box.Top, ContentBlock.Paragraph(text)));
+            result.Add((box.Top, IsHeading(paragraph, bodySize) ? ContentBlock.Heading(text) : ContentBlock.Paragraph(text)));
         }
 
         if (orphans.Count > 0)
@@ -229,6 +240,16 @@ public sealed class PdfProcessor(IPageRenderer renderer)
 
         yield return current;
     }
+
+    /// <summary>The font size used by most letters on the page (the body text).</summary>
+    private static double DominantFontSize(IEnumerable<Word> words) =>
+        words.SelectMany(w => w.Letters)
+            .GroupBy(l => Math.Round(l.PointSize * 2) / 2)
+            .MaxBy(g => g.Count())?.Key ?? 0;
+
+    /// <summary>Short blocks set clearly larger than the body text, e.g. "Chapter One".</summary>
+    private static bool IsHeading(IReadOnlyList<TextLine> lines, double bodySize) =>
+        bodySize > 0 && lines.Count <= 3 && lines.Min(FontSize) >= bodySize * 1.25;
 
     private static double FontSize(TextLine line) =>
         line.Words.SelectMany(w => w.Letters).Select(l => l.PointSize).DefaultIfEmpty(line.BoundingBox.Height).Max();
@@ -358,7 +379,7 @@ public sealed class PdfProcessor(IPageRenderer renderer)
             title = Path.GetFileNameWithoutExtension(title[wordPrefix.Length..]);
         }
 
-        if (string.IsNullOrWhiteSpace(title) || title.Equals("untitled", StringComparison.OrdinalIgnoreCase))
+        if (IsPlaceholderTitle(title))
         {
             title = fallbackTitle;
         }
@@ -366,6 +387,13 @@ public sealed class PdfProcessor(IPageRenderer renderer)
         var author = doc.Information.Author?.Trim();
         return (Truncate(title, 300), string.IsNullOrWhiteSpace(author) ? null : Truncate(author, 300));
     }
+
+    /// <summary>Metadata titles that are really file names or editor defaults ("novel.html", "Document1").</summary>
+    public static bool IsPlaceholderTitle([NotNullWhen(false)] string? title) =>
+        string.IsNullOrWhiteSpace(title) || PlaceholderTitleRegex().IsMatch(title.Trim());
+
+    [GeneratedRegex(@"^(untitled\s*\d*|document\s*\d*|.+\.(html?|xhtml|docx?|odt|rtf|txt|md|tex|pdf|indd|pages|epub))$", RegexOptions.IgnoreCase)]
+    private static partial Regex PlaceholderTitleRegex();
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
 }

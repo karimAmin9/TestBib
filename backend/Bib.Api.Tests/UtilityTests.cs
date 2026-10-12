@@ -38,6 +38,18 @@ public sealed class TextNormalizerTests
         Assert.Equal("", TextNormalizer.CharacterDiff("abc", "cba"));
     }
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("  ", true)]
+    [InlineData("novel.html", true)]
+    [InlineData("Chapter 1.docx", true)]
+    [InlineData("Untitled", true)]
+    [InlineData("Document1", true)]
+    [InlineData("The Lighthouse Keeper", false)]
+    [InlineData("Mr. Smith goes to Washington", false)]
+    public void Placeholder_titles_fall_back_to_the_file_name(string? title, bool placeholder) =>
+        Assert.Equal(placeholder, PdfProcessor.IsPlaceholderTitle(title));
+
     [Fact]
     public void Joining_lines_records_removed_hyphens()
     {

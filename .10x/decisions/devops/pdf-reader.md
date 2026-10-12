@@ -1,0 +1,14 @@
+# pdf-reader: delivery
+- **Images:**
+  - `backend/Dockerfile`: sdk:10.0 → aspnet:10.0, non-root, port 8080, `/data` volume.
+  - `frontend/Dockerfile`: node:24 build → nginx:1.29, with SPA fallback, `/api` reverse proxy and security headers.
+- **Compose:**
+  - `docker compose up -d postgres` for development.
+  - `docker compose --profile full up -d --build` for the full stack on :8080.
+  - Verified on 2026-10-12: health 200, conversion works with PDFium on Linux, images are served through nginx.
+- **Migrations** run on API startup (`Database:MigrateOnStartup`). This is fine for a single instance. With more than one instance, run `dotnet ef database update` as a release step instead.
+- **Rollback:** redeploy the previous image tag. Migrations are additive so far. Take a DB and volume backup before deploying any migration that drops something.
+- **Not done yet (next step when deploying):**
+  - a CI pipeline (GitHub Actions: `dotnet test` with Docker available, `ng test`, image build)
+  - an image registry
+  - TLS termination (Caddy/Traefik in front of `web`)

@@ -67,8 +67,8 @@ public sealed partial class ConversionVerifier
     private static PageVerification VerifyPage(Page page, ProcessedChapter chapter, string imageDir)
     {
         var notes = new List<string>();
-        var paragraphs = chapter.Blocks.Where(b => b.Type == BlockTypes.Paragraph).Select(b => b.Text ?? "").ToList();
-        var unknownBlocks = chapter.Blocks.Count(b => b.Type is not (BlockTypes.Paragraph or BlockTypes.Image));
+        var paragraphs = chapter.Blocks.Where(b => BlockTypes.IsText(b.Type)).Select(b => b.Text ?? "").ToList();
+        var unknownBlocks = chapter.Blocks.Count(b => !BlockTypes.IsText(b.Type) && b.Type != BlockTypes.Image);
         if (unknownBlocks > 0)
         {
             notes.Add($"{unknownBlocks} block(s) have an unknown type.");
