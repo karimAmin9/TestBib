@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Bib.Api.Tests/Bib.Api.Tests.csproj" />
+  <Project Path="Bib.Api/Bib.Api.csproj" />
+</Solution>
