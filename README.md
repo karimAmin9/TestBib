@@ -106,9 +106,27 @@ The whole stack builds into two containers plus Postgres:
 POSTGRES_PASSWORD=change-me docker compose --profile full up -d --build
 ```
 
-nginx serves the Angular app on port 8080 and proxies `/api` to the API on the same origin, which the
-`SameSite=Strict` auth cookie requires. Put a TLS-terminating proxy in front of it in production. The API honours
-`X-Forwarded-Proto`, so cookies are marked `Secure` behind HTTPS.
+nginx serves the Angular app on `127.0.0.1:8080` and proxies `/api` to the API on the same origin, which the
+`SameSite=Strict` auth cookie requires. Ports are bound to localhost only; remote devices come in through Tailscale
+(below) or a TLS-terminating proxy. The API honours `X-Forwarded-Proto`, so cookies are marked `Secure` behind HTTPS.
+All containers restart automatically when Docker starts.
+
+### On your own PC, reachable from your phone (Tailscale)
+
+The site runs on this PC and is reachable only from your own devices, over HTTPS, from anywhere. It is never
+exposed to the public internet. Free, but only available while the PC is on, awake and signed in (Docker Desktop
+starts at sign-in).
+
+1. Start the stack once (no `POSTGRES_PASSWORD` needed, Postgres is only reachable from this PC):
+   `docker compose --profile full up -d --build`, then check http://localhost:8080.
+2. Install [Tailscale](https://tailscale.com/download) on the PC and on your phone, and sign in to the same account on both.
+3. In the [Tailscale admin console](https://login.tailscale.com/admin/dns), enable **MagicDNS** and **HTTPS Certificates**.
+4. On the PC: `tailscale serve --bg http://127.0.0.1:8080`. It prints the address, e.g. `https://<pc-name>.<tailnet>.ts.net`.
+5. Open that address on your phone (Tailscale must be connected) and add it to your home screen.
+
+To update after code changes, run `docker compose --profile full up -d --build` again. Never add `-v` to
+`docker compose down` and don't use Docker Desktop's "Reset to factory defaults": both delete the volumes holding
+your books.
 
 Configuration (environment variables):
 
