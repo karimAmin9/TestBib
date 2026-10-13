@@ -22,3 +22,6 @@ data/
 # Local secrets
 appsettings.*.local.json
 .env
+
+# Local-only dev test accounts
+docs/dev-test-accounts.md
