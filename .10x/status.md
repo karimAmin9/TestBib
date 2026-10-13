@@ -1,16 +1,23 @@
 # Status: pdf-reader
-**Phase:** Delivery Complete (local + Docker verified; public hosting not yet set up)
+**Phase:** Delivery Complete. Self-hosted on the owner's PC (2026-10-13); phone access via Tailscale pending.
 
 | # | Task | Status |
 |---|------|--------|
 | 1 | Repo, state, ADRs 001-005 | done |
-| 2 | Backend scaffold, EF, Identity, migration | done |
+| 2 | Backend scaffold, EF, Identity, migration | done (Data/ restored 2026-10-13, see below) |
 | 3 | Fidelity tests + PdfProcessor | done |
 | 4 | ConversionVerifier, mutation + corpus tests, worker | done |
 | 5 | Endpoints + integration tests | done |
 | 6 | Angular scaffold + auth | done |
 | 7 | Library / Detail / Reader + verification UI | done |
 | 8 | QA, security hardening, Docker, README | done |
+| 9 | local-hosting: stack on PC, localhost-only ports, auto-restart | done |
+| 10 | local-hosting: Tailscale on PC + phone, `tailscale serve` | pending (owner) |
 
-**Tests:** backend 83/83, frontend 29/29 green.
-**Release readiness:** ready for private/self-hosted use. Before public internet: see security review findings 1-5, add CI and TLS.
+**Tests:** backend 84/84, frontend 29/29 green (2026-10-13 run: backend only).
+**Deploy history:**
+- 2026-10-13: full stack on the owner's PC at 127.0.0.1:8080, verified end to end; DB empty and ready for use.
+
+**2026-10-13 fix:** `backend/Bib.Api/Data/` (AppDbContext, entities, migrations) had never been committed because the
+`.gitignore` rule `data/` also matches `Data/` on Windows. Rebuilt from the DBA schema and code usage, with a fresh
+`InitialCreate` migration. Databases created from the original migrations would not match this history.
