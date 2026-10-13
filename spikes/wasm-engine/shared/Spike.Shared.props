@@ -1,0 +1,15 @@
+<Project>
+  <!-- The real conversion engine, compiled from the repo sources (minus the PDFium renderer) + the spike runner. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RepoConversion>$(MSBuildThisFileDirectory)..\..\..\backend\Bib.Api\Conversion</RepoConversion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(RepoConversion)\*.cs" Exclude="$(RepoConversion)\PageRenderer.cs;$(RepoConversion)\TextNormalizer.cs" LinkBase="Conversion" />
+    <Compile Include="$(MSBuildThisFileDirectory)*.cs;$(MSBuildThisFileDirectory)patched\*.cs" LinkBase="Shared" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.12" />
+  </ItemGroup>
+</Project>

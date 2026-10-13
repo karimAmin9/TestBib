@@ -1,6 +1,6 @@
 # phone-app: run Bib entirely on the phone (installable offline web app)
 
-**Date:** 2026-10-13 · **Status:** approach agreed with the owner; rollout not started (Phase 0 next)
+**Date:** 2026-10-13 · **Status:** Phase 0 done, **GO** (report: `.10x/reviews/2026-10-13-phone-app-spike.md`); Phase 1 next
 **Supersedes:** [local-hosting](local-hosting.md) as the way to use Bib on the phone.
 
 ## Requirements (owner)
@@ -38,8 +38,13 @@
 0. **Spike, go/no-go**: build the engine for WebAssembly; convert the corpus PDFs and a real long novel in Chrome
    with mobile CPU throttling; measure time and memory; decide interpreter vs AOT (`wasm-tools` workload) and the
    max file size.
+   **Result (2026-10-13): GO.** 270-page novel ≈ 101 s at 4× (mid-range phone), 169 s at 6×; 40 MB photo book
+   ≈ 18 s at 4×; ≈ 150 MB memory; output byte-identical to native. Interpreter, no AOT for now.
 1. **Shared engine**: move `Conversion/` into a `Bib.Conversion` library; server and all tests unchanged and green.
-2. **Browser engine**: WASM worker + pdf.js renderer + JS API (`convert(pdf) → progress → result`).
+   Plus, from the spike: replaceable NFKC in `TextNormalizer` (browser has none in .NET) and source-generated JSON
+   in `ConversionJson` (trim-safe).
+2. **Browser engine**: WASM worker + pdf.js renderer + JS API (`convert(pdf) → progress → result`). Book readable
+   after processing; verification runs afterwards in the background (~1/3 of the time).
 3. **Local mode in the frontend**: IndexedDB library service, no login, blob URLs, persistent storage.
 4. **PWA + CI/CD**: manifest, icons, service worker, update banner; Actions workflow test → build → deploy Pages.
 5. **Go-live**: owner enables Pages (Settings → Pages → Source: GitHub Actions), pushes, installs the app on the

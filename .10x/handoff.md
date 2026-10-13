@@ -1,14 +1,21 @@
 # Handoff
 
 ## Current Handoff
-From: DevOps (phone-app) to SDE / Architect for implementation.
+From: DevOps (phone-app Phase 0 spike) to SDE / Architect for Phase 1.
 - Plan, architecture, risks and rollback: `.10x/decisions/devops/phone-app.md`
+- Spike result **GO**: `.10x/reviews/2026-10-13-phone-app-spike.md`; reusable code and benchmark in `spikes/wasm-engine/`
+  (worker loading, `[JSImport]` NFKC, DevTools-throttled benchmark).
+- Phase 1 must include: `Bib.Conversion` library; replaceable NFKC in `TextNormalizer`; source-generated JSON in
+  `ConversionJson`. All 84 backend tests stay green; re-run `node spikes/wasm-engine/bench.mjs` as a regression check.
 - Owner decisions: phone-only PWA, Android/Chrome, €0 without card, books only on the phone, no backups, no login,
   GitHub Pages (public repo), retire the server only after the app works on the phone.
-- Start with **Phase 0 (spike)**: it decides whether phone performance is acceptable before any refactoring.
-  Installing the `wasm-tools` workload (AOT) needs the owner's OK.
+- AOT (`wasm-tools` workload) is optional and needs the owner's OK before installing.
 - The server stack keeps running untouched until Phase 5: `docker compose --profile full up -d`, http://127.0.0.1:8080.
 - Owner actions later: enable GitHub Pages (Source: GitHub Actions), approve pushes, install the app on the phone.
+
+## History
+### 2026-10-13: DevOps (phone-app plan) to SDE / Architect
+- Plan agreed; Phase 0 (spike) first. Superseded by the spike handoff above.
 
 ## History
 ### 2026-10-13: DevOps (local-hosting) to SRE / the owner
