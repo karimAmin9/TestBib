@@ -1,5 +1,6 @@
 # Status: pdf-reader
-**Phase:** Delivery Complete. Self-hosted on the owner's PC (2026-10-13); phone access via Tailscale pending.
+**Phase:** Delivery Complete. Self-hosted on the owner's PC (2026-10-13). Next: **phone-app**, the whole app on the
+phone as an offline PWA (`.10x/decisions/devops/phone-app.md`), Phase 0 (WebAssembly spike) not started.
 
 | # | Task | Status |
 |---|------|--------|
@@ -12,7 +13,13 @@
 | 7 | Library / Detail / Reader + verification UI | done |
 | 8 | QA, security hardening, Docker, README | done |
 | 9 | local-hosting: stack on PC, localhost-only ports, auto-restart | done |
-| 10 | local-hosting: Tailscale on PC + phone, `tailscale serve` | pending (owner) |
+| 10 | local-hosting: Tailscale on PC + phone, `tailscale serve` | dropped (superseded by phone-app) |
+| 11 | phone-app P0: WebAssembly spike, go/no-go on phone performance | next |
+| 12 | phone-app P1: shared `Bib.Conversion` library | planned |
+| 13 | phone-app P2: browser engine (WASM worker + pdf.js renderer) | planned |
+| 14 | phone-app P3: frontend local mode (IndexedDB, no login) | planned |
+| 15 | phone-app P4: PWA + GitHub Actions → GitHub Pages | planned |
+| 16 | phone-app P5: go-live on the phone, retire the server | planned (owner: enable Pages, push, install) |
 
 **Tests:** backend 84/84, frontend 29/29 green (2026-10-13 run: backend only).
 **Deploy history:**

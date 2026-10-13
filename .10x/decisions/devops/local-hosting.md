@@ -1,6 +1,8 @@
 # local-hosting: run on the owner's PC, private access from the phone
 
-**Date:** 2026-10-13 · **Status:** stack deployed and verified locally; Tailscale setup pending (owner)
+**Date:** 2026-10-13 · **Status:** stack deployed and verified locally. **Superseded by [phone-app](phone-app.md)**
+the same day (owner needs the phone to work while the PC is off); Tailscale was never set up. The stack stays
+until phone-app Phase 5.
 
 ## Requirements (from the owner)
 - Single user (owner only). Use the site from the phone, from anywhere.

@@ -1,16 +1,20 @@
 # Handoff
 
 ## Current Handoff
-From: DevOps (local-hosting) to SRE / the owner.
-- Decisions, operations and runbook additions: `.10x/decisions/devops/local-hosting.md`
-- Environment: owner's Windows PC, Docker Desktop, project `testbib`, http://127.0.0.1:8080 (volumes `testbib_pgdata`, `testbib_bookdata`).
-- Deploy/update: `docker compose --profile full up -d --build`. Rollback: previous commit, same command.
-- Pending (owner): install Tailscale on PC and phone, enable MagicDNS + HTTPS certificates, then
-  `tailscale serve --bg http://127.0.0.1:8080`. Also enable Docker Desktop "Start when you sign in" and stop the PC from sleeping.
-- No backups by the owner's decision: `down -v` or Docker "Reset to factory defaults" loses all books.
-- SRE: fold the local-hosting runbook lines into `.10x/decisions/sre/pdf-reader.md` when the setup is final.
+From: DevOps (phone-app) to SDE / Architect for implementation.
+- Plan, architecture, risks and rollback: `.10x/decisions/devops/phone-app.md`
+- Owner decisions: phone-only PWA, Android/Chrome, €0 without card, books only on the phone, no backups, no login,
+  GitHub Pages (public repo), retire the server only after the app works on the phone.
+- Start with **Phase 0 (spike)**: it decides whether phone performance is acceptable before any refactoring.
+  Installing the `wasm-tools` workload (AOT) needs the owner's OK.
+- The server stack keeps running untouched until Phase 5: `docker compose --profile full up -d`, http://127.0.0.1:8080.
+- Owner actions later: enable GitHub Pages (Source: GitHub Actions), approve pushes, install the app on the phone.
 
 ## History
+### 2026-10-13: DevOps (local-hosting) to SRE / the owner
+- Decisions: `.10x/decisions/devops/local-hosting.md`. Stack on the owner's PC at 127.0.0.1:8080, verified.
+- Tailscale was never set up: superseded by phone-app the same day.
+
 ### 2026-10-12: DevOps/SRE to the next feature work
 - Runbook: `.10x/decisions/sre/pdf-reader.md`
 - Deploy: README "Deployment" + `.10x/decisions/devops/pdf-reader.md`
