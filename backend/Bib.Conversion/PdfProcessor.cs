@@ -10,7 +10,7 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.ReadingOrderDetector;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 using UglyToad.PdfPig.Exceptions;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 /// <summary>
 /// Converts a PDF into chapters (one per page) of paragraphs and images.

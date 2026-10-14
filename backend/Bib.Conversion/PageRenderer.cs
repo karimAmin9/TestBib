@@ -1,31 +1,13 @@
-using Docnet.Core;
-using Docnet.Core.Models;
-
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 /// <summary>A rendered page as BGRA pixels.</summary>
 public sealed record RenderedPage(byte[] Bgra, int Width, int Height);
 
+/// <summary>Rasterizes PDF pages. Hosts supply it: PDFium on the server, pdf.js in the browser.</summary>
 public interface IPageRenderer
 {
     /// <summary>Renders the 0-based page at <paramref name="scale"/> (1.0 = 72 dpi).</summary>
     RenderedPage Render(byte[] pdf, int pageIndex, double scale);
-}
-
-/// <summary>PDFium-based renderer (Docnet). PDFium is not thread-safe, so calls are serialized.</summary>
-public sealed class DocnetPageRenderer : IPageRenderer
-{
-    private static readonly Lock Gate = new();
-
-    public RenderedPage Render(byte[] pdf, int pageIndex, double scale)
-    {
-        lock (Gate)
-        {
-            using var doc = DocLib.Instance.GetDocReader(pdf, new PageDimensions(scale));
-            using var page = doc.GetPageReader(pageIndex);
-            return new RenderedPage(page.GetImage(), page.GetPageWidth(), page.GetPageHeight());
-        }
-    }
 }
 
 public static class RenderedPageExtensions

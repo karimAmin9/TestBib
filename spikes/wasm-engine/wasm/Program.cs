@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices.JavaScript;
-using Bib.Api.Conversion;
+using Bib.Conversion;
+using Bib.Spike;
 
 // .NET in the browser cannot do NFKC; the browser can (String.prototype.normalize, ICU-backed in Chromium).
 TextNormalizer.NfkcImplementation = BrowserText.Nfkc;

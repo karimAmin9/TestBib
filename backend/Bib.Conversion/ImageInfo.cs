@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 public sealed record ImageDimensions(string Format, int Width, int Height);
 

@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 /// <summary>
 /// Proof-reads a conversion: re-opens the original PDF independently and checks, page by page,

@@ -1,4 +1,4 @@
-using Bib.Api.Conversion;
+using Bib.Spike;
 
 // Usage: Spike.Native <pdf>...   Prints one JSON line per file (second run of each, so the JIT is warm).
 foreach (var path in args)

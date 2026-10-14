@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Tokens;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 public sealed record ExtractedImage(byte[] Bytes, string Extension);
 
