@@ -1,22 +1,23 @@
 # Handoff
 
 ## Current Handoff
-From: SDE (phone-app Phase 3, local library) to QA / Security for review, then DevOps for Phase 4.
-- What was built and verified: `.10x/decisions/sde/phone-app.md` (Phase 3). Branch `phone-app-phase3-local-library`
-  (stacked on phases 1 and 2).
-- **Try it:** `npm --prefix frontend run engine`, `npm --prefix frontend start`, http://localhost:4200: add a PDF.
-- **Review focus:** IndexedDB transactions (`core/db.ts`: nothing but requests awaited inside); delete during a
-  conversion; resume rules; object URL lifetime; no remaining server calls (verified: zero `/api` requests).
-- **Phase 4 next (DevOps):** PWA (manifest, icons, Angular service worker incl. the engine and pdf.js files,
-  "update available" prompt), CSP as `<meta>` (`script-src 'self' 'wasm-unsafe-eval'`, `img-src 'self' data: blob:`,
-  `worker-src 'self'`), GitHub Pages under `/TestBib/` (base href, 404.html fallback), GitHub Actions: tests →
-  `npm run engine` → `ng build` → deploy. Owner enables Pages and approves the push.
-- The README Deployment section (Docker/Tailscale) is outdated for the local app; rewrite it in Phase 4.
-- Unchanged: owner decisions (phone-only PWA, Android, €0, no login/backups, GitHub Pages); AOT needs the owner's OK;
-  the server stack stays until Phase 5. Docker Desktop is normally stopped on the owner's PC: start it for integration
-  tests and stop it again with `docker desktop stop`.
+From: DevOps (phone-app Phase 4, PWA + GitHub Pages) to SRE / the owner.
+- Decisions, pipeline, verification, rollback: `.10x/decisions/devops/phone-app.md` (Phase 4). Branch
+  `phone-app-phase4-pwa-pages` (stacked on phases 1–3; one PR to `main` carries all four).
+- **Go-live steps (owner):** Settings → Pages → Source: **GitHub Actions**; approve push + PR; merge → workflow
+  "Test and publish" deploys to https://karimamin9.github.io/TestBib/ (≈5–10 min).
+- **Smoke test after deploy:** open on the phone → install → add a PDF → "Verified 1:1"; airplane mode → app still
+  opens and reads. Phase 5: real-phone timing with the owner's own PDFs, then retire the server.
+- **Operate:** updates = push to main (banner on the phone); rollback = revert on main or re-run an earlier commit.
+  Local check of a production build: `npm --prefix frontend run build:pages` + `serve:pages` (:4300/TestBib/).
+- Legacy Docker frontend: CSP lacks `'wasm-unsafe-eval'`, conversion won't run there; removal in Phase 5.
+- Unchanged: owner decisions (phone-only PWA, Android, €0, no login/backups, GitHub Pages); AOT needs the owner's OK.
+  Docker Desktop is normally stopped on the owner's PC: start it for integration tests, stop with `docker desktop stop`.
 
 ## History
+### 2026-10-14: SDE (phone-app Phase 3, local library) to QA / Security, then DevOps
+- IndexedDB library without login, verified in the browser. Branch `phone-app-phase3-local-library`.
+
 ### 2026-10-14: SDE (phone-app Phase 2, browser engine) to QA / Security
 - Engine in a Web Worker (`frontend/engine`), pdf.js renderer, `BibEngine` client, lab page (removed in Phase 3).
   Branch `phone-app-phase2-browser-engine`.

@@ -1,7 +1,8 @@
 # phone-app: run Bib entirely on the phone (installable offline web app)
 
 **Date:** 2026-10-13 · **Status:** Phase 0 done, **GO** (report: `.10x/reviews/2026-10-13-phone-app-spike.md`);
-Phases 1–3 done 2026-10-14 (`.10x/decisions/sde/phone-app.md`); Phase 4 next
+Phases 1–3 done 2026-10-14 (`.10x/decisions/sde/phone-app.md`); Phase 4 built and verified locally, first
+deploy pending (owner: enable Pages, approve push/merge)
 **Supersedes:** [local-hosting](local-hosting.md) as the way to use Bib on the phone.
 
 ## Requirements (owner)
@@ -50,6 +51,41 @@ Phases 1–3 done 2026-10-14 (`.10x/decisions/sde/phone-app.md`); Phase 4 next
 4. **PWA + CI/CD**: manifest, icons, service worker, update banner; Actions workflow test → build → deploy Pages.
 5. **Go-live**: owner enables Pages (Settings → Pages → Source: GitHub Actions), pushes, installs the app on the
    phone, tests a real book. Then retire the server: API, Postgres, Docker and compose removed, containers stopped.
+
+## Phase 4: PWA + GitHub Pages (2026-10-14, built and verified locally; first deploy pending owner)
+- **Pipeline** `.github/workflows/pages.yml` ("Test and publish"): on PRs, push to main, manual. Build job:
+  `dotnet test backend/Bib.slnx` (incl. Testcontainers integration tests; ubuntu runner has Docker) → `npm ci` →
+  frontend tests → `npm run engine` → `npm run build:pages -- /<repo>/` → upload artifact (main only). Deploy job
+  (main only): `actions/deploy-pages`, environment `github-pages`, `pages: write` + `id-token: write` only there;
+  workflow default `contents: read`. PR runs cancel older PR runs; main runs never cancel (no cut-off deploys).
+  Actions: checkout v7, setup-dotnet v6, setup-node v7 (Node 24, npm cache), upload-pages-artifact v5,
+  deploy-pages v5 (latest majors on 2026-10-14).
+- **Build for Pages** `npm run build:pages` (`scripts/build-pages.mjs`): `ng build --base-href /TestBib/` + `404.html`
+  copy (deep links). Refuses to run without the engine. `npm run serve:pages` (`scripts/serve-dist.mjs`) serves the
+  build Pages-style under /TestBib/ on :4300 (launch config `pages`).
+- **PWA**: `@angular/service-worker` 22.2.2, `ngsw-config.json`: `app` (prefetch: index, JS/CSS, fonts, icons,
+  manifest), `engine` (prefetch: `/engine/**` + pdf.js worker, ≈15 MB raw, ≈5 MB gzip on the first visit, so
+  conversion works offline right away), `pdfjs-on-demand` (lazy: cmaps, standard fonts, wasm decoders, ICC).
+  `manifest.webmanifest` (standalone, relative start_url/scope), icons from `scripts/make-icons.ps1` (any + maskable).
+- **Updates**: `AppUpdates` → banner "A new version of Bib is ready · Update now"; checks again whenever the app
+  returns to the foreground; `unrecoverable` → reload. Interrupted conversions resume (Phase 3).
+- **CSP** as `<meta>` (Pages can't set headers): `default-src 'self'; script-src 'self' 'wasm-unsafe-eval';
+  style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';
+  worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`. (`frame-ancestors` is not possible in a
+  meta tag; Pages sends no X-Frame-Options either: accepted, the app holds no credentials.)
+
+### Verified locally (production build under /TestBib/, Pages-like server)
+- No CSP violations; conversion with the engine, pdf.js covers and blob images under the CSP: Verified 1:1.
+- Service worker registered for /TestBib/; caches: app 45, engine 35 files.
+- **Update flow**: rebuilt → reload → banner after 0.8 s → "Update now" → new version running.
+- **Offline**: server stopped → app starts from the cache, library shown, a new PDF converted and Verified 1:1.
+- Found and fixed on the way: covers fell back to the placeholder on a fresh load, because a not-yet-loaded object
+  URL rendered as `src=""` (error event). Images now show a transparent `LOADING_IMAGE` until their URL exists
+  (regression test `book-cover.spec.ts`).
+
+### Rollback
+Revert on `main` (or re-run the workflow on an earlier commit): phones get it as the next update. IndexedDB schema
+is forward-only, so a rollback across a schema change needs the old code to tolerate the newer schema.
 
 ## Risks
 | Risk | Mitigation |

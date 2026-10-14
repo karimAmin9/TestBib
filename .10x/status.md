@@ -3,7 +3,8 @@
 phone as an offline PWA (`.10x/decisions/devops/phone-app.md`). Phase 0 done: **GO**
 (`.10x/reviews/2026-10-13-phone-app-spike.md`). Phase 1 done (2026-10-14): shared `Bib.Conversion` library.
 Phase 2 done (2026-10-14): engine runs in the browser. Phase 3 done (2026-10-14): the app is local-only (IndexedDB
-library, no login, no server calls). Phase 4 next.
+library, no login, no server calls). Phase 4 built (2026-10-14): installable offline PWA + Test-and-publish
+workflow to GitHub Pages; waits for the owner to enable Pages and approve the push.
 
 | # | Task | Status |
 |---|------|--------|
@@ -21,10 +22,10 @@ library, no login, no server calls). Phase 4 next.
 | 12 | phone-app P1: shared `Bib.Conversion` library + NFKC hook + source-generated JSON | done (88/88, identical output, 0 trim warnings) |
 | 13 | phone-app P2: browser engine (WASM worker + pdf.js renderer) + lab page | done (all samples Verified 1:1 in the browser) |
 | 14 | phone-app P3: frontend local mode (IndexedDB, no login) | done (add/convert/resume/read/delete verified in the browser) |
-| 15 | phone-app P4: PWA + GitHub Actions → GitHub Pages | next |
+| 15 | phone-app P4: PWA + GitHub Actions → GitHub Pages | built + verified locally (offline, updates, CSP); first deploy pending owner |
 | 16 | phone-app P5: go-live on the phone, retire the server | planned (owner: enable Pages, push, install) |
 
-**Tests:** backend 89/89, frontend 46/46 (2026-10-14).
+**Tests:** backend 89/89, frontend 51/51 (2026-10-14).
 **Deploy history:**
 - 2026-10-13: full stack on the owner's PC at 127.0.0.1:8080, verified end to end; DB empty and ready for use.
 
