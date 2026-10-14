@@ -16,8 +16,10 @@ dist/
 .angular/
 coverage/
 
-# Runtime data (uploaded PDFs, extracted images)
-data/
+# Runtime data (uploaded PDFs, extracted images, data-protection keys).
+# Don't ignore "data/" itself: on case-insensitive filesystems that also matches the Data/ source folder.
+backend/Bib.Api/data/books/
+backend/Bib.Api/data/keys/
 
 # Local secrets
 appsettings.*.local.json

@@ -3,3 +3,6 @@
 **/data
 **/TestResults
 Bib.Api.Tests
+# Dev-mode runtime files. On Windows they live inside the Data/ source folder (same directory as data/).
+Bib.Api/Data/books
+Bib.Api/Data/keys

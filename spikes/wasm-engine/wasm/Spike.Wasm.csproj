@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <Import Project="..\shared\Spike.Shared.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- ConversionJson uses reflection-based System.Text.Json, which trimming breaks (positional record parameter
+         names are stripped). The real app will use source-generated JSON; the spike measures speed untrimmed. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+</Project>
