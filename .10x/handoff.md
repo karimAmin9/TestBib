@@ -1,21 +1,24 @@
 # Handoff
 
 ## Current Handoff
-From: SDE (phone-app Phase 1, shared engine) to QA / Security for review, then SDE for Phase 2.
-- What was built and verified: `.10x/decisions/sde/phone-app.md`. Branch `phone-app-phase1-shared-engine`.
-- **Review focus:** `backend/Bib.Conversion` must stay trim-safe and browser-safe. `ConversionJsonTests` guarantees
-  stored JSON is unchanged (no DB migration). `TextNormalizer.NfkcImplementation` is process-global: set once by the
-  browser host, never by the server or tests.
-- **What to test:** `dotnet test backend/Bib.slnx` (88, needs Docker); the browser regression check
-  `node spikes/wasm-engine/bench.mjs "worker, 1x"` (fingerprints must match `results-2026-10-13.txt`); the API image
-  builds and converts in the Linux container (done 2026-10-14).
-- **Phase 2 next** (`.10x/decisions/devops/phone-app.md`): browser engine = WASM worker + pdf.js `IPageRenderer` +
-  JS API with progress; book readable after processing, verification afterwards.
+From: SDE (phone-app Phase 2, browser engine) to QA / Security for review, then SDE for Phase 3.
+- What was built and verified: `.10x/decisions/sde/phone-app.md` (Phase 2). Branch `phone-app-phase2-browser-engine`
+  (stacked on `phone-app-phase1-shared-engine`).
+- **Try it:** `npm --prefix frontend run engine`, `npm --prefix frontend start`, open http://localhost:4200/lab/engine.
+- **Review focus:** worker protocol (`frontend/engine/wwwroot/engine-worker.js` ↔ `src/app/engine/bib-engine.ts`);
+  `EngineApi.ReadImage` only accepts verifier-valid image names; pdf.js `intent: 'print'` (background rendering);
+  CSP for Phase 4: .NET needs `'wasm-unsafe-eval'`, pdf.js needs `worker-src 'self'` and blob/data images.
+- **Phase 3 next:** local library in IndexedDB using `BibEngine.convert` (store on `onConverted`, then the report),
+  no login, blob URLs in reader/library, `navigator.storage.persist()`. Remove the lab page afterwards.
 - Unchanged: owner decisions (phone-only PWA, Android, €0, no login/backups, GitHub Pages); AOT needs the owner's OK;
   the server stack stays until Phase 5. Docker Desktop is normally stopped on the owner's PC: start it for integration
   tests and stop it again with `docker desktop stop`.
 
 ## History
+### 2026-10-14: SDE (phone-app Phase 1, shared engine) to QA / Security
+- `backend/Bib.Conversion` library, NFKC hook, source-generated JSON; 88/88; identical fingerprints. Branch
+  `phone-app-phase1-shared-engine`.
+
 ### 2026-10-13: DevOps (phone-app Phase 0 spike) to SDE / Architect for Phase 1
 - Spike **GO**: `.10x/reviews/2026-10-13-phone-app-spike.md`; code in `spikes/wasm-engine/`. Phase 1 scope: library,
   NFKC hook, source-generated JSON. Done 2026-10-14.

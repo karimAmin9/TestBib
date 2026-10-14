@@ -1,7 +1,7 @@
 # phone-app: run Bib entirely on the phone (installable offline web app)
 
 **Date:** 2026-10-13 · **Status:** Phase 0 done, **GO** (report: `.10x/reviews/2026-10-13-phone-app-spike.md`);
-Phase 1 done 2026-10-14 (`.10x/decisions/sde/phone-app.md`); Phase 2 next
+Phases 1–2 done 2026-10-14 (`.10x/decisions/sde/phone-app.md`); Phase 3 next
 **Supersedes:** [local-hosting](local-hosting.md) as the way to use Bib on the phone.
 
 ## Requirements (owner)
