@@ -1,5 +1,6 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { LocalLibrary } from '../../core/library.service';
 import { BookSummary } from '../../core/models';
 import { BookCover } from '../../shared/book-cover';
 import { Icon } from '../../shared/icon';
@@ -30,13 +31,17 @@ import { VerificationBadge } from '../../shared/verification-badge';
         <div class="meta">
           @switch (b.status) {
             @case ('Ready') {
-              <app-verification-badge
-                [status]="b.verificationStatus"
-                [pagesWithIssues]="b.pagesWithIssues"
-              />
+              @if (b.verificationStatus === 'None') {
+                <span class="pill neutral">Checking 1:1…</span>
+              } @else {
+                <app-verification-badge
+                  [status]="b.verificationStatus"
+                  [pagesWithIssues]="b.pagesWithIssues"
+                />
+              }
             }
             @case ('Processing') {
-              <span class="pill neutral">Converting…</span>
+              <span class="pill neutral">{{ convertingLabel() }}</span>
             }
             @case ('Failed') {
               <span class="pill bad">Conversion failed</span>
@@ -51,7 +56,7 @@ import { VerificationBadge } from '../../shared/verification-badge';
           <p class="excerpt">{{ b.excerpt }}</p>
         } @else if (b.status === 'Processing') {
           <p class="excerpt muted">
-            The PDF is being converted and proof-read. This page updates automatically.
+            The PDF is being converted on this device. You can keep using the app in the meantime.
           </p>
         }
       </div>
@@ -240,7 +245,16 @@ import { VerificationBadge } from '../../shared/verification-badge';
   `,
 })
 export class BookCard {
+  private readonly library = inject(LocalLibrary);
   readonly book = input.required<BookSummary>();
+
+  /** "Converting 45/270" while this book converts; "Converting…" while it waits for its turn. */
+  protected readonly convertingLabel = computed(() => {
+    const c = this.library.conversion();
+    return c?.bookId === this.book().id && c.stage === 'processing'
+      ? `Converting ${c.done}/${c.total}`
+      : 'Converting…';
+  });
 
   protected readonly readLink = computed(() => [
     '/book',

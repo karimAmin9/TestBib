@@ -14,15 +14,21 @@ export interface EngineChapter {
   removed: Removal[];
 }
 
+/** A file the engine produced (PNG or JPEG). */
+export interface EngineFile {
+  bytes: Uint8Array;
+  type: 'image/png' | 'image/jpeg';
+}
+
 /** A converted book plus its binary files: everything needed to store and read it. */
 export interface ConvertedBook {
   title: string;
   author: string | null;
   pageCount: number;
   chapters: EngineChapter[];
-  cover: Blob | null;
+  cover: EngineFile | null;
   /** Image files by the name the image blocks use as `src`. */
-  images: Map<string, Blob>;
+  images: Map<string, EngineFile>;
 }
 
 export interface EngineProgress {
@@ -99,10 +105,10 @@ export class BibEngine {
       ]);
       const { hasCover, ...book } = JSON.parse(json) as EngineBook;
 
-      const cover = hasCover ? toBlob(await this.call<Uint8Array>(worker, { type: 'cover' }), 'cover.png') : null;
-      const images = new Map<string, Blob>();
+      const cover = hasCover ? toFile(await this.call<Uint8Array>(worker, { type: 'cover' }), 'cover.png') : null;
+      const images = new Map<string, EngineFile>();
       for (const name of imageNames(book.chapters)) {
-        images.set(name, toBlob(await this.call<Uint8Array>(worker, { type: 'image', name }), name));
+        images.set(name, toFile(await this.call<Uint8Array>(worker, { type: 'image', name }), name));
       }
       const converted: ConvertedBook = { ...book, cover, images };
       await options.onConverted?.(converted);
@@ -191,6 +197,6 @@ export function imageNames(chapters: EngineChapter[]): string[] {
   return [...new Set(chapters.flatMap((c) => c.blocks.filter((b) => b.type === 'img' && b.src).map((b) => b.src!)))];
 }
 
-function toBlob(bytes: Uint8Array, name: string): Blob {
-  return new Blob([bytes as Uint8Array<ArrayBuffer>], { type: name.endsWith('.jpg') ? 'image/jpeg' : 'image/png' });
+function toFile(bytes: Uint8Array, name: string): EngineFile {
+  return { bytes, type: name.endsWith('.jpg') ? 'image/jpeg' : 'image/png' };
 }

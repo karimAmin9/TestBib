@@ -1,9 +1,9 @@
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { Conversion, LocalLibrary } from '../../core/library.service';
 import { BookSummary } from '../../core/models';
-import { Library, MAX_UPLOAD_BYTES, POLL_INTERVAL_MS } from './library';
+import { Library } from './library';
 
 function book(overrides: Partial<BookSummary> = {}): BookSummary {
   return {
@@ -23,110 +23,102 @@ function book(overrides: Partial<BookSummary> = {}): BookSummary {
   };
 }
 
+/** Stands in for the on-device library (covered by library.service.spec.ts). */
+class FakeLibrary {
+  books: BookSummary[] = [];
+  readonly version = signal(0);
+  readonly conversion = signal<Conversion | null>(null);
+  readonly list = vi.fn(async () => this.books);
+  readonly add = vi.fn(async (_file: File): Promise<BookSummary> => book());
+  coverUrl = () => null;
+
+  /** What LocalLibrary does after every write. */
+  changed(books: BookSummary[]): void {
+    this.books = books;
+    this.version.update((v) => v + 1);
+  }
+}
+
 const flushPromises = () => new Promise<void>((r) => setTimeout(r, 0));
 
 describe('Library', () => {
-  let http: HttpTestingController;
+  let library: FakeLibrary;
 
   beforeEach(() => {
+    library = new FakeLibrary();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [provideRouter([]), { provide: LocalLibrary, useValue: library }],
     });
-    http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  function create() {
+  async function create() {
     const fixture = TestBed.createComponent(Library);
     fixture.detectChanges();
+    await flushPromises();
+    await fixture.whenStable();
     return fixture;
   }
 
+  const text = (fixture: { nativeElement: HTMLElement }) => fixture.nativeElement.textContent ?? '';
+
   it('renders a card per book with progress and verification', async () => {
-    const fixture = create();
-    http
-      .expectOne('/api/books')
-      .flush([book({ progress: { chapterNumber: 5, scrollPercent: 10, updatedAt: '' } })]);
+    library.books = [book({ progress: { chapterNumber: 5, scrollPercent: 10, updatedAt: '' } })];
+    const fixture = await create();
+
+    expect(fixture.nativeElement.querySelectorAll('app-book-card').length).toBe(1);
+    expect(text(fixture)).toContain('The Lighthouse');
+    expect(text(fixture)).toContain('Continue: Page 5');
+    expect(text(fixture)).toContain('Verified 1:1');
+  });
+
+  it('reads the library again whenever it changes', async () => {
+    library.books = [book({ status: 'Processing', verificationStatus: 'None' })];
+    const fixture = await create();
+    expect(text(fixture)).toContain('Converting…');
+
+    library.changed([book()]);
     await flushPromises();
     await fixture.whenStable();
 
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelectorAll('app-book-card').length).toBe(1);
-    expect(el.textContent).toContain('The Lighthouse');
-    expect(el.textContent).toContain('Continue: Page 5');
-    expect(el.textContent).toContain('Verified 1:1');
+    expect(library.list).toHaveBeenCalledTimes(2);
+    expect(text(fixture)).toContain('Verified 1:1');
   });
 
-  it('polls while a book is processing and stops when it is ready', async () => {
-    vi.useFakeTimers();
-    const fixture = create();
+  it('shows the live conversion progress and the 1:1 check on the cards', async () => {
+    library.books = [
+      book({ id: 'a', status: 'Processing', verificationStatus: 'None' }),
+      book({ id: 'b', title: 'Second', verificationStatus: 'None' }),
+    ];
+    const fixture = await create();
 
-    http.expectOne('/api/books').flush([book({ status: 'Processing' })]);
-    await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
-
-    http.expectOne('/api/books').flush([book({ status: 'Ready' })]);
-    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3);
-
-    http.expectNone('/api/books');
-    fixture.destroy();
-  });
-
-  it('stops polling when the page is left', async () => {
-    vi.useFakeTimers();
-    const fixture = create();
-    http.expectOne('/api/books').flush([book({ status: 'Processing' })]);
-    await vi.advanceTimersByTimeAsync(0);
-
-    fixture.destroy();
-    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3);
-
-    http.expectNone('/api/books');
-  });
-
-  it('rejects non-PDF and oversized files before uploading', async () => {
-    const fixture = create();
-    http.expectOne('/api/books').flush([]);
-    await flushPromises();
-    const library = fixture.componentInstance;
-
-    library.start(new File(['hello'], 'notes.txt', { type: 'text/plain' }));
+    library.conversion.set({ bookId: 'a', stage: 'processing', done: 45, total: 270 });
     await fixture.whenStable();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Only PDF files');
 
-    const big = new File(['x'], 'big.pdf', { type: 'application/pdf' });
-    Object.defineProperty(big, 'size', { value: MAX_UPLOAD_BYTES + 1 });
-    library.start(big);
-    await fixture.whenStable();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('larger than 100 MB');
-
-    http.expectNone('/api/books');
+    expect(text(fixture)).toContain('Converting 45/270');
+    expect(text(fixture)).toContain('Checking 1:1…');
   });
 
-  it('uploads a PDF and shows it as processing', async () => {
-    const fixture = create();
-    http.expectOne('/api/books').flush([]);
-    await flushPromises();
+  it('adds a PDF to the library', async () => {
+    const fixture = await create();
+    const file = new File(['%PDF-1.7'], 'story.pdf', { type: 'application/pdf' });
 
-    fixture.componentInstance.start(
-      new File(['%PDF-1.7'], 'story.pdf', { type: 'application/pdf' }),
-    );
-    const req = http.expectOne((r) => r.method === 'POST' && r.url === '/api/books');
-    expect(req.request.body instanceof FormData).toBe(true);
-    req.flush(book({ id: 'new', title: 'story', status: 'Processing' }), {
-      status: 202,
-      statusText: 'Accepted',
-    });
-    await flushPromises();
-
-    http.expectOne('/api/books').flush([book({ id: 'new', title: 'story', status: 'Processing' })]);
+    await fixture.componentInstance.start(file);
+    library.changed([book({ id: 'new', title: 'story', status: 'Processing', verificationStatus: 'None' })]);
     await flushPromises();
     await fixture.whenStable();
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Converting…');
-    fixture.destroy();
+    expect(library.add).toHaveBeenCalledWith(file);
+    expect(text(fixture)).toContain('story');
+    expect(text(fixture)).toContain('Converting…');
+  });
+
+  it('explains why a file could not be added', async () => {
+    library.add.mockRejectedValueOnce(new Error('Only PDF files can be added.'));
+    const fixture = await create();
+
+    await fixture.componentInstance.start(new File(['hello'], 'notes.txt', { type: 'text/plain' }));
+    await fixture.whenStable();
+
+    expect(text(fixture)).toContain('Only PDF files can be added.');
   });
 });

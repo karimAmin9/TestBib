@@ -2,11 +2,6 @@ export type BookStatus = 'Processing' | 'Ready' | 'Failed';
 export type VerificationStatus = 'None' | 'Verified' | 'Warnings' | 'Differences';
 export type PageStatus = 'Pass' | 'Warning' | 'Fail';
 
-export interface Me {
-  id: string;
-  email: string;
-}
-
 export interface Progress {
   chapterNumber: number;
   scrollPercent: number;

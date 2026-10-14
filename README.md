@@ -1,20 +1,24 @@
 # Bib: your PDFs as readable novels
 
-Upload a PDF and it shows up as a book in your library, laid out like a web-novel site. Open it and you read it
+Add a PDF and it shows up as a book in your library, laid out like a web-novel site. Open it and you read it
 as reflowed text with the images in place, not as a PDF.
 Every conversion is **proof-read automatically** against the original PDF. The badge on each book shows whether
 the text and images matched 1:1.
 
-| Part      | Tech |
-|-----------|------|
-| Frontend  | Angular 22 (standalone components, signals), TypeScript, SCSS |
-| Backend   | ASP.NET Core 10 minimal API, EF Core, ASP.NET Core Identity (cookie auth) |
-| PDF       | [PdfPig](https://github.com/UglyToad/PdfPig) (text, layout, images) + PDFium via Docnet (page rendering) |
-| Database  | PostgreSQL 17 |
+Everything runs **on your device**: the PDF is converted in the browser and the library is stored there. Nothing is
+uploaded, and there is no account.
+
+| Part       | Tech |
+|------------|------|
+| App        | Angular 22 (standalone components, signals), TypeScript, SCSS |
+| Conversion | `backend/Bib.Conversion` (C#) running as .NET 10 WebAssembly in a Web Worker: [PdfPig](https://github.com/UglyToad/PdfPig) for text, layout and images, [pdf.js](https://mozilla.github.io/pdf.js/) for covers and drawn pages |
+| Storage    | IndexedDB in the browser (books, pages, images, original PDFs, check reports) |
+| Legacy server | ASP.NET Core 10 API + PostgreSQL 17 (the previous version, still used by the backend tests; to be removed) |
 
 ## How it works
 
-1. **Upload:** `POST /api/books` stores the PDF and queues it. The card shows *Converting…*.
+1. **Add:** the PDF is stored on the device and the book appears right away as *Converting…*. Conversions run
+   one at a time in the background and resume if the app was closed in the middle.
 2. **Convert:** `PdfProcessor` turns every PDF page into one chapter ("Page N") made of paragraphs and images,
    in reading order. Hyphenated line breaks are joined and page numbers in the margins are dropped. Both are
    *recorded* rather than silently lost. Images are extracted unchanged (JPEG passthrough, PNG otherwise).
@@ -29,48 +33,38 @@ the text and images matched 1:1.
    - **Images:** the counts match, every file exists and decodes, its pixel size equals the PDF image, and its
      SHA-256 equals a fresh re-extraction from the PDF. Any mismatch is a **Fail**.
 
-   The result appears as *✓ Verified 1:1*, *⚠ N pages with notes*, or *⚠ N pages differ*. Affected pages show a
-   note in the reader. The full report is at `GET /api/books/{id}/verification`.
+   The book is readable as soon as it is converted; the check runs afterwards (about a third of the time) and
+   the result appears as *✓ Verified 1:1*, *⚠ N pages with notes*, or *⚠ N pages differ*. Affected pages show a
+   note in the reader.
 4. **Read:** the reader has prev/next buttons, a page dropdown, ←/→ keys, light/sepia/dark themes, font size,
    line spacing and column width. Reading progress is saved per book ("Continue: Page N").
 
 ## Development
 
-Prerequisites: .NET SDK 10, Node 24, Docker Desktop.
+Prerequisites: .NET SDK 10 and Node 24 for the app; Docker Desktop only for the backend integration tests.
 
-Start PostgreSQL:
-
-```bash
-docker compose up -d postgres
-```
-
-Run the API on http://localhost:5219. Migrations run automatically on startup:
-
-```bash
-dotnet run --project backend/Bib.Api
-```
-
-Install the frontend packages, then start the dev server on http://localhost:4200, which proxies `/api` to the API:
+Install the packages and build the conversion engine into `frontend/public/engine` (again after changing
+`backend/Bib.Conversion`):
 
 ```bash
 npm --prefix frontend install
 ```
 
 ```bash
-npm --prefix frontend start
-```
-
-### Conversion in the browser (phone app, in progress)
-
-The conversion engine (`backend/Bib.Conversion`) also runs in the browser as .NET WebAssembly in a Web Worker
-(`frontend/engine`), with pdf.js drawing covers and pages. Build it once, and again after changing the engine:
-
-```bash
 npm --prefix frontend run engine
 ```
 
-Then open http://localhost:4200/lab/engine and pick a PDF. It is converted and proof-read entirely in the browser,
-and nothing is uploaded. `?pdf=<path>` converts a file served by the dev server directly.
+Start the dev server on http://localhost:4200:
+
+```bash
+npm --prefix frontend start
+```
+
+### Legacy server (being retired)
+
+The previous version ran conversion and storage on a server. It is still in the repository (`backend/Bib.Api`,
+`docker-compose.yml`) and covered by the backend tests, but the app no longer uses it. To run it anyway:
+`docker compose up -d postgres`, then `dotnet run --project backend/Bib.Api` (http://localhost:5219).
 
 ### Two setups, two databases
 Dev mode uses the database `bib_dev` and stores files in `backend/Bib.Api/data`; the Docker stack uses the database `bib` and the `bookdata` volume. Books uploaded in one setup are therefore not visible in the other.

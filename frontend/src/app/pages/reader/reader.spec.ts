@@ -1,7 +1,6 @@
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
+import { LocalLibrary } from '../../core/library.service';
 import { Chapter, PageVerification } from '../../core/models';
 import { PROGRESS_DEBOUNCE_MS, Reader, displaySize } from './reader';
 
@@ -39,17 +38,26 @@ function failedPage(): PageVerification {
   };
 }
 
+/** Stands in for the on-device library (covered by library.service.spec.ts). */
+class FakeLibrary {
+  page = chapter();
+  readonly get = vi.fn(async () => ({ book: { title: 'The Lighthouse' }, chapters: [] }));
+  readonly chapter = vi.fn(async () => this.page);
+  readonly saveProgress = vi.fn(async (_id: string, _n: number, _percent: number) => undefined);
+  imageUrl = (id: string, src: string) => `blob:${id}/${src}`;
+}
+
 describe('Reader', () => {
-  let http: HttpTestingController;
+  let library: FakeLibrary;
   let navigate: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     localStorage.clear();
     window.scrollTo = vi.fn() as never;
+    library = new FakeLibrary();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [provideRouter([]), { provide: LocalLibrary, useValue: library }],
     });
-    http = TestBed.inject(HttpTestingController);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
 
@@ -59,16 +67,15 @@ describe('Reader', () => {
     const fixture = TestBed.createComponent(Reader);
     fixture.componentRef.setInput('id', 'b1');
     fixture.componentRef.setInput('n', c.number);
+    library.page = c;
     fixture.detectChanges();
-    http.expectOne('/api/books/b1').flush({ book: { title: 'The Lighthouse' }, chapters: [] });
-    http.expectOne(`/api/books/b1/chapters/${c.number}`).flush(c);
+    await new Promise<void>((r) => setTimeout(r, 0)); // the fake library's promises are not Angular tasks
     await fixture.whenStable();
     return fixture;
   }
 
   const el = (f: ComponentFixture<Reader>) => f.nativeElement as HTMLElement;
-  const progressRequests = () =>
-    http.match((r) => r.method === 'PUT' && r.url === '/api/books/b1/progress');
+  const progressSaves = () => library.saveProgress.mock.calls;
 
   it('renders paragraphs and images in order', async () => {
     const f = await open();
@@ -80,7 +87,7 @@ describe('Reader', () => {
     expect(blocks[0]!.textContent).toBe('Chapter Two');
     expect(blocks[1]!.textContent).toBe('First paragraph.');
     const img = el(f).querySelector('figure img') as HTMLImageElement;
-    expect(img.getAttribute('src')).toBe('/api/books/b1/images/p2-1.jpg');
+    expect(img.getAttribute('src')).toBe('blob:b1/p2-1.jpg');
     expect(img.getAttribute('width')).toBe('64');
     expect(el(f).querySelector('h1')!.textContent).toContain('Page 2');
     expect(el(f).textContent).toContain('The Lighthouse');
@@ -154,18 +161,17 @@ describe('Reader', () => {
 
   it('saves progress when a page opens and once after scrolling stops', async () => {
     const f = await open();
-    const opened = progressRequests();
-    expect(opened.length).toBe(1);
-    expect(opened[0]!.request.body).toEqual({ chapterNumber: 2, scrollPercent: 0 });
+    expect(progressSaves()).toEqual([['b1', 2, 0]]);
+    library.saveProgress.mockClear();
 
     vi.useFakeTimers();
     f.componentInstance.onScroll();
     f.componentInstance.onScroll();
     vi.advanceTimersByTime(PROGRESS_DEBOUNCE_MS - 1);
-    expect(progressRequests().length).toBe(0);
+    expect(progressSaves().length).toBe(0);
     vi.advanceTimersByTime(1);
 
-    expect(progressRequests().length).toBe(1);
+    expect(progressSaves().length).toBe(1);
   });
 
   it('applies the theme from the reader settings', async () => {
