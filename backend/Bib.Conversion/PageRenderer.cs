@@ -6,8 +6,11 @@ public sealed record RenderedPage(byte[] Bgra, int Width, int Height);
 /// <summary>Rasterizes PDF pages. Hosts supply it: PDFium on the server, pdf.js in the browser.</summary>
 public interface IPageRenderer
 {
-    /// <summary>Renders the 0-based page at <paramref name="scale"/> (1.0 = 72 dpi).</summary>
-    RenderedPage Render(byte[] pdf, int pageIndex, double scale);
+    /// <summary>
+    /// Renders the 0-based page at <paramref name="scale"/> (1.0 = 72 dpi). Asynchronous because pdf.js only renders
+    /// asynchronously; PDFium completes synchronously.
+    /// </summary>
+    ValueTask<RenderedPage> RenderAsync(byte[] pdf, int pageIndex, double scale);
 }
 
 public static class RenderedPageExtensions

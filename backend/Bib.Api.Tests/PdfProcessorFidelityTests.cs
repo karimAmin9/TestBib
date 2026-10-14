@@ -14,6 +14,24 @@ public sealed class PdfProcessorFidelityTests : IDisposable
     public void Dispose() => _h.Dispose();
 
     [Fact]
+    public async Task Processor_and_verifier_report_progress_after_every_page()
+    {
+        var pdf = new FixturePdf()
+            .Page(p => p.Paragraph("One."))
+            .Page(p => p.Paragraph("Two."))
+            .Page(p => p.Paragraph("Three."))
+            .Build();
+        var processed = new List<(int, int)>();
+        var verified = new List<(int, int)>();
+
+        var book = await _h.Processor.ProcessAsync(pdf, _h.ImageDir, "progress", (n, total) => processed.Add((n, total)));
+        _h.Verifier.Verify(pdf, book.Chapters, _h.ImageDir, (n, total) => verified.Add((n, total)));
+
+        Assert.Equal([(1, 3), (2, 3), (3, 3)], processed);
+        Assert.Equal([(1, 3), (2, 3), (3, 3)], verified);
+    }
+
+    [Fact]
     public void Paragraphs_over_several_pages_are_reproduced_exactly_and_in_order()
     {
         var pdf = new FixturePdf()

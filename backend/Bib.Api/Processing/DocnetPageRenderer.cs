@@ -9,13 +9,13 @@ public sealed class DocnetPageRenderer : IPageRenderer
 {
     private static readonly Lock Gate = new();
 
-    public RenderedPage Render(byte[] pdf, int pageIndex, double scale)
+    public ValueTask<RenderedPage> RenderAsync(byte[] pdf, int pageIndex, double scale)
     {
         lock (Gate)
         {
             using var doc = DocLib.Instance.GetDocReader(pdf, new PageDimensions(scale));
             using var page = doc.GetPageReader(pageIndex);
-            return new RenderedPage(page.GetImage(), page.GetPageWidth(), page.GetPageHeight());
+            return ValueTask.FromResult(new RenderedPage(page.GetImage(), page.GetPageWidth(), page.GetPageHeight()));
         }
     }
 }

@@ -62,6 +62,16 @@ export interface PageVerification {
   notes: string[];
 }
 
+export interface VerificationReport {
+  status: PageStatus;
+  pageCount: number;
+  pagesPassed: number;
+  pagesWithWarnings: number;
+  pagesFailed: number;
+  notes: string[];
+  pages: PageVerification[];
+}
+
 export interface Chapter {
   number: number;
   title: string;

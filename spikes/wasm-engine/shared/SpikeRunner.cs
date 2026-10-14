@@ -16,7 +16,8 @@ public static class SpikeRunner
         {
             var total = Stopwatch.StartNew();
             var sw = Stopwatch.StartNew();
-            var book = new PdfProcessor(new BlankPageRenderer()).Process(pdf, imageDir, "spike");
+            // BlankPageRenderer completes synchronously, so this never blocks on JavaScript.
+            var book = new PdfProcessor(new BlankPageRenderer()).ProcessAsync(pdf, imageDir, "spike").GetAwaiter().GetResult();
             var processMs = sw.ElapsedMilliseconds;
 
             // Verify what would be stored (JSON round trip), like BookConversionService does.

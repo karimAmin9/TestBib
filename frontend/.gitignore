@@ -2,6 +2,8 @@
 
 # Compiled output
 /dist
+# Conversion engine, built by `npm run engine`
+/public/engine
 /tmp
 /out-tsc
 /bazel-out

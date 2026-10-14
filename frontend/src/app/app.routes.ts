@@ -34,5 +34,11 @@ export const routes: Routes = [
     title: 'Reading · Bib',
     loadComponent: () => import('./pages/reader/reader').then((m) => m.Reader),
   },
+  {
+    // phone-app Phase 2 test page for the in-browser conversion engine (not linked from the app)
+    path: 'lab/engine',
+    title: 'Engine lab · Bib',
+    loadComponent: () => import('./pages/lab/engine-lab').then((m) => m.EngineLab),
+  },
   { path: '**', redirectTo: '' },
 ];

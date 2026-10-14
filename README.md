@@ -60,6 +60,18 @@ npm --prefix frontend install
 npm --prefix frontend start
 ```
 
+### Conversion in the browser (phone app, in progress)
+
+The conversion engine (`backend/Bib.Conversion`) also runs in the browser as .NET WebAssembly in a Web Worker
+(`frontend/engine`), with pdf.js drawing covers and pages. Build it once, and again after changing the engine:
+
+```bash
+npm --prefix frontend run engine
+```
+
+Then open http://localhost:4200/lab/engine and pick a PDF. It is converted and proof-read entirely in the browser,
+and nothing is uploaded. `?pdf=<path>` converts a file served by the dev server directly.
+
 ### Two setups, two databases
 Dev mode uses the database `bib_dev` and stores files in `backend/Bib.Api/data`; the Docker stack uses the database `bib` and the `bookdata` volume. Books uploaded in one setup are therefore not visible in the other.
 
