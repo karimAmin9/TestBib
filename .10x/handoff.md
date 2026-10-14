@@ -1,23 +1,28 @@
 # Handoff
 
 ## Current Handoff
-From: DevOps (phone-app Phase 0 spike) to SDE / Architect for Phase 1.
-- Plan, architecture, risks and rollback: `.10x/decisions/devops/phone-app.md`
-- Spike result **GO**: `.10x/reviews/2026-10-13-phone-app-spike.md`; reusable code and benchmark in `spikes/wasm-engine/`
-  (worker loading, `[JSImport]` NFKC, DevTools-throttled benchmark).
-- Phase 1 must include: `Bib.Conversion` library; replaceable NFKC in `TextNormalizer`; source-generated JSON in
-  `ConversionJson`. All 84 backend tests stay green; re-run `node spikes/wasm-engine/bench.mjs` as a regression check.
-- Owner decisions: phone-only PWA, Android/Chrome, €0 without card, books only on the phone, no backups, no login,
-  GitHub Pages (public repo), retire the server only after the app works on the phone.
-- AOT (`wasm-tools` workload) is optional and needs the owner's OK before installing.
-- The server stack keeps running untouched until Phase 5: `docker compose --profile full up -d`, http://127.0.0.1:8080.
-- Owner actions later: enable GitHub Pages (Source: GitHub Actions), approve pushes, install the app on the phone.
+From: SDE (phone-app Phase 1, shared engine) to QA / Security for review, then SDE for Phase 2.
+- What was built and verified: `.10x/decisions/sde/phone-app.md`. Branch `phone-app-phase1-shared-engine`.
+- **Review focus:** `backend/Bib.Conversion` must stay trim-safe and browser-safe. `ConversionJsonTests` guarantees
+  stored JSON is unchanged (no DB migration). `TextNormalizer.NfkcImplementation` is process-global: set once by the
+  browser host, never by the server or tests.
+- **What to test:** `dotnet test backend/Bib.slnx` (88, needs Docker); the browser regression check
+  `node spikes/wasm-engine/bench.mjs "worker, 1x"` (fingerprints must match `results-2026-10-13.txt`); the API image
+  builds and converts in the Linux container (done 2026-10-14).
+- **Phase 2 next** (`.10x/decisions/devops/phone-app.md`): browser engine = WASM worker + pdf.js `IPageRenderer` +
+  JS API with progress; book readable after processing, verification afterwards.
+- Unchanged: owner decisions (phone-only PWA, Android, €0, no login/backups, GitHub Pages); AOT needs the owner's OK;
+  the server stack stays until Phase 5. Docker Desktop is normally stopped on the owner's PC: start it for integration
+  tests and stop it again with `docker desktop stop`.
 
 ## History
+### 2026-10-13: DevOps (phone-app Phase 0 spike) to SDE / Architect for Phase 1
+- Spike **GO**: `.10x/reviews/2026-10-13-phone-app-spike.md`; code in `spikes/wasm-engine/`. Phase 1 scope: library,
+  NFKC hook, source-generated JSON. Done 2026-10-14.
+
 ### 2026-10-13: DevOps (phone-app plan) to SDE / Architect
-- Plan agreed; Phase 0 (spike) first. Superseded by the spike handoff above.
+- Plan agreed; Phase 0 (spike) first.
 
-## History
 ### 2026-10-13: DevOps (local-hosting) to SRE / the owner
 - Decisions: `.10x/decisions/devops/local-hosting.md`. Stack on the owner's PC at 127.0.0.1:8080, verified.
 - Tailscale was never set up: superseded by phone-app the same day.
