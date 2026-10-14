@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "start"],
       "port": 4200
+    },
+    {
+      "name": "pages",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["frontend/scripts/serve-dist.mjs", "4300"],
+      "port": 4300
     }
   ]
 }

@@ -94,7 +94,11 @@ npm --prefix frontend test -- --watch=false
 | `PdfProcessorFidelityTests` | PDFs generated in code with known content come out word-for-word, in order, with byte- or pixel-identical images |
 | `CorpusTests` | Browser-printed PDFs (`Fixtures/corpus`, real fonts, ligatures, umlauts, columns, images) reproduce the source text exactly, and every page passes verification |
 | `ConversionVerifierTests` | Mutation tests: a dropped, injected or changed word, a duplicated paragraph, a missing, swapped, resized or corrupted image, a missing or extra chapter are all detected, and clean output passes |
-| `BooksApiTests` | Auth required, users isolated from each other, path traversal blocked, upload validation, progress, rename/delete |
+| `BooksApiTests` | Auth required, users isolated from each other, path traversal blocked, upload validation, progress, rename/delete (legacy server) |
+| `ConversionJsonTests` | Stored JSON keeps exactly the earlier format |
+| `library.service.spec` (frontend) | On-device library: background conversion, readable before the check, resume after closing the app, retry, delete mid-conversion, validation |
+| `bib-engine.spec` (frontend) | Engine worker protocol: render requests, progress, errors, one conversion at a time |
+| `app-updates.spec`, `book-cover.spec` (frontend) | Update prompt; covers never show a broken image while loading |
 
 The corpus PDFs are regenerated with `backend/Bib.Api.Tests/Fixtures/corpus/generate.ps1` (Windows + Edge).
 
@@ -104,45 +108,51 @@ The corpus PDFs are regenerated with `backend/Bib.Api.Tests/Fixtures/corpus/gene
 cd backend && dotnet tool restore && dotnet ef migrations add <Name> --project Bib.Api -o Data/Migrations
 ```
 
-## Deployment
+## Deployment (GitHub Pages)
 
-The whole stack builds into two containers plus Postgres:
+Every push to `main` runs all tests and, if they pass, publishes the app to
+**https://karimamin9.github.io/TestBib/** (`.github/workflows/pages.yml`). Pull requests run the tests only.
+One-time setup: repository **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+The site is static: no server, no account, no cost. The service worker caches the app and the conversion engine on
+the first visit, so it works offline afterwards. Books never leave the device.
+
+### On your phone (Android)
+
+1. Open https://karimamin9.github.io/TestBib/ in Chrome.
+2. Menu **⋮ → Install app** (or "Add to home screen").
+3. Open Bib from the home screen. It works offline from now on.
+
+Books live in the browser storage of that app. Uninstalling it, or clearing Chrome's data for the site, deletes them.
+
+### Updates
+
+Push to `main`; a few minutes later the new version is live. The app downloads it in the background and shows
+**"A new version of Bib is ready" → Update now**. A conversion that was running restarts by itself after the update.
+
+### Rollback
+
+Revert the commit on `main`, or re-run the workflow for an earlier commit (Actions tab). Phones receive it as the
+next update. Stored books are not affected; the storage schema only migrates forward, so keep schema changes additive.
+
+### Try the production build locally
 
 ```bash
-POSTGRES_PASSWORD=change-me docker compose --profile full up -d --build
+npm --prefix frontend run build:pages
 ```
 
-nginx serves the Angular app on `127.0.0.1:8080` and proxies `/api` to the API on the same origin, which the
-`SameSite=Strict` auth cookie requires. Ports are bound to localhost only; remote devices come in through Tailscale
-(below) or a TLS-terminating proxy. The API honours `X-Forwarded-Proto`, so cookies are marked `Secure` behind HTTPS.
-All containers restart automatically when Docker starts.
+```bash
+npm --prefix frontend run serve:pages
+```
 
-### On your own PC, reachable from your phone (Tailscale)
+Then open http://localhost:4300/TestBib/. localhost counts as a secure origin, so installing, offline use and updates
+work as on the real site. Run `npm --prefix frontend run engine` first if the engine was never built.
 
-The site runs on this PC and is reachable only from your own devices, over HTTPS, from anywhere. It is never
-exposed to the public internet. Free, but only available while the PC is on, awake and signed in (Docker Desktop
-starts at sign-in).
+### Legacy Docker stack
 
-1. Start the stack once (no `POSTGRES_PASSWORD` needed, Postgres is only reachable from this PC):
-   `docker compose --profile full up -d --build`, then check http://localhost:8080.
-2. Install [Tailscale](https://tailscale.com/download) on the PC and on your phone, and sign in to the same account on both.
-3. In the [Tailscale admin console](https://login.tailscale.com/admin/dns), enable **MagicDNS** and **HTTPS Certificates**.
-4. On the PC: `tailscale serve --bg http://127.0.0.1:8080`. It prints the address, e.g. `https://<pc-name>.<tailnet>.ts.net`.
-5. Open that address on your phone (Tailscale must be connected) and add it to your home screen.
-
-To update after code changes, run `docker compose --profile full up -d --build` again. Never add `-v` to
-`docker compose down` and don't use Docker Desktop's "Reset to factory defaults": both delete the volumes holding
-your books.
-
-Configuration (environment variables):
-
-| Variable | Purpose |
-|----------|---------|
-| `ConnectionStrings__Default` | PostgreSQL connection string |
-| `Storage__Root` | Directory for PDFs, covers and extracted images (mount a volume) |
-| `Database__MigrateOnStartup` | `true` by default |
-
-Back up **both** the Postgres volume and the storage volume.
+`docker compose --profile full up -d --build` still builds the previous server version (nginx + API + Postgres on
+`127.0.0.1:8080`). It is no longer maintained and will be removed. Never run `docker compose down -v` while it holds
+books you want to keep.
 
 ## Project notes
 

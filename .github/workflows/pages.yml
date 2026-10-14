@@ -1,0 +1,73 @@
+# Tests every push and pull request. On main, the app is then published to GitHub Pages:
+# https://<owner>.github.io/<repository>/ (one-time setup: Settings → Pages → Source: GitHub Actions).
+name: Test and publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A newer push to a pull request replaces the older run; runs on main always finish (never cut off a deploy).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Backend tests (conversion engine; the API's integration tests use Docker)
+        run: dotnet test backend/Bib.slnx
+
+      - name: Install frontend packages
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend tests
+        working-directory: frontend
+        run: npm test -- --watch=false
+
+      - name: Build the conversion engine (.NET WebAssembly)
+        working-directory: frontend
+        run: npm run engine
+
+      - name: Build the app for GitHub Pages
+        working-directory: frontend
+        run: npm run build:pages -- "/${{ github.event.repository.name }}/"
+
+      - name: Upload the site
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: frontend/dist/frontend/browser
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -12,7 +12,7 @@ import {
   untracked,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { LocalLibrary, errorMessage } from '../../core/library.service';
+import { LOADING_IMAGE, LocalLibrary, errorMessage } from '../../core/library.service';
 import { Chapter, ChapterRef, ContentBlock } from '../../core/models';
 import { ReaderSettingsService } from '../../core/reader-settings.service';
 import { Icon } from '../../shared/icon';
@@ -174,7 +174,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
                       aria-label="Show image full screen"
                     >
                       <img
-                        [attr.src]="library.imageUrl(id(), block.src)"
+                        [src]="library.imageUrl(id(), block.src) ?? loadingImage"
                         [attr.width]="size.w"
                         [attr.height]="size.h"
                         loading="lazy"
@@ -262,7 +262,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
 
     @if (zoom(); as src) {
       <div class="lightbox" role="dialog" aria-label="Image" (click)="zoom.set(null)">
-        <img [attr.src]="library.imageUrl(id(), src)" alt="" />
+        <img [src]="library.imageUrl(id(), src) ?? loadingImage" alt="" />
         <button type="button" class="lightbox-close" aria-label="Close">
           <app-icon name="close" [size]="26" />
         </button>
@@ -273,6 +273,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
 })
 export class Reader {
   protected readonly library = inject(LocalLibrary);
+  protected readonly loadingImage = LOADING_IMAGE;
   protected readonly settings = inject(ReaderSettingsService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);

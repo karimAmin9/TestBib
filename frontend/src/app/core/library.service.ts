@@ -13,6 +13,12 @@ import {
 import { BookDetail, BookSummary, Chapter, ContentBlock } from './models';
 
 export const MAX_BOOK_BYTES = 100 * 1024 * 1024;
+
+/**
+ * A transparent 1×1 image for `src` while an object URL loads. Never bind null: Angular turns it into `src=""`,
+ * which fires an error event (and the cover would give up and show its placeholder).
+ */
+export const LOADING_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 export const EXCERPT_LENGTH = 420;
 const SOURCE = 'source.pdf';
 const COVER = 'cover.png';

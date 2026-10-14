@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
+import { AppUpdates } from './core/app-updates';
 import { Icon } from './shared/icon';
 
 /**
@@ -55,6 +56,13 @@ import { Icon } from './shared/icon';
       <main class="content">
         <router-outlet />
       </main>
+
+      @if (updates.ready()) {
+        <div class="update" role="status">
+          <span>A new version of Bib is ready.</span>
+          <button type="button" class="btn small" (click)="updates.apply()">Update now</button>
+        </div>
+      }
     </div>
   `,
   styles: `
@@ -139,6 +147,23 @@ import { Icon } from './shared/icon';
     .mobile-menu {
       display: none;
     }
+    .update {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      z-index: 50;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: max-content;
+      max-width: calc(100vw - 32px);
+      padding: 10px 12px 10px 16px;
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      color: var(--text-strong);
+    }
 
     @media (max-width: 760px) {
       .shell {
@@ -198,6 +223,7 @@ import { Icon } from './shared/icon';
   `,
 })
 export class App {
+  protected readonly updates = inject(AppUpdates);
   private readonly router = inject(Router);
   protected readonly menuOpen = signal(false);
 
