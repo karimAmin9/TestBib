@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+
+  <!--
+    The conversion engine (backend/Bib.Conversion) as WebAssembly for the browser. Built into public/engine/ by
+    `npm run engine` (scripts/build-engine.mjs); wwwroot/engine-worker.js runs it in a Web Worker.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- All JSON is source-generated; reflection stays off so anything relying on it fails in the build, not on the phone. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\Bib.Conversion\Bib.Conversion.csproj" />
+  </ItemGroup>
+
+</Project>

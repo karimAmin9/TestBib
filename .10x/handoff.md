@@ -1,23 +1,38 @@
 # Handoff
 
 ## Current Handoff
-From: DevOps (phone-app Phase 0 spike) to SDE / Architect for Phase 1.
-- Plan, architecture, risks and rollback: `.10x/decisions/devops/phone-app.md`
-- Spike result **GO**: `.10x/reviews/2026-10-13-phone-app-spike.md`; reusable code and benchmark in `spikes/wasm-engine/`
-  (worker loading, `[JSImport]` NFKC, DevTools-throttled benchmark).
-- Phase 1 must include: `Bib.Conversion` library; replaceable NFKC in `TextNormalizer`; source-generated JSON in
-  `ConversionJson`. All 84 backend tests stay green; re-run `node spikes/wasm-engine/bench.mjs` as a regression check.
-- Owner decisions: phone-only PWA, Android/Chrome, €0 without card, books only on the phone, no backups, no login,
-  GitHub Pages (public repo), retire the server only after the app works on the phone.
-- AOT (`wasm-tools` workload) is optional and needs the owner's OK before installing.
-- The server stack keeps running untouched until Phase 5: `docker compose --profile full up -d`, http://127.0.0.1:8080.
-- Owner actions later: enable GitHub Pages (Source: GitHub Actions), approve pushes, install the app on the phone.
+From: DevOps (phone-app Phase 4, PWA + GitHub Pages) to SRE / the owner.
+- Decisions, pipeline, verification, rollback: `.10x/decisions/devops/phone-app.md` (Phase 4). Branch
+  `phone-app-phase4-pwa-pages` (stacked on phases 1–3; one PR to `main` carries all four).
+- **Go-live steps (owner):** Settings → Pages → Source: **GitHub Actions**; approve push + PR; merge → workflow
+  "Test and publish" deploys to https://karimamin9.github.io/TestBib/ (≈5–10 min).
+- **Smoke test after deploy:** open on the phone → install → add a PDF → "Verified 1:1"; airplane mode → app still
+  opens and reads. Phase 5: real-phone timing with the owner's own PDFs, then retire the server.
+- **Operate:** updates = push to main (banner on the phone); rollback = revert on main or re-run an earlier commit.
+  Local check of a production build: `npm --prefix frontend run build:pages` + `serve:pages` (:4300/TestBib/).
+- Legacy Docker frontend: CSP lacks `'wasm-unsafe-eval'`, conversion won't run there; removal in Phase 5.
+- Unchanged: owner decisions (phone-only PWA, Android, €0, no login/backups, GitHub Pages); AOT needs the owner's OK.
+  Docker Desktop is normally stopped on the owner's PC: start it for integration tests, stop with `docker desktop stop`.
 
 ## History
+### 2026-10-14: SDE (phone-app Phase 3, local library) to QA / Security, then DevOps
+- IndexedDB library without login, verified in the browser. Branch `phone-app-phase3-local-library`.
+
+### 2026-10-14: SDE (phone-app Phase 2, browser engine) to QA / Security
+- Engine in a Web Worker (`frontend/engine`), pdf.js renderer, `BibEngine` client, lab page (removed in Phase 3).
+  Branch `phone-app-phase2-browser-engine`.
+
+### 2026-10-14: SDE (phone-app Phase 1, shared engine) to QA / Security
+- `backend/Bib.Conversion` library, NFKC hook, source-generated JSON; 88/88; identical fingerprints. Branch
+  `phone-app-phase1-shared-engine`.
+
+### 2026-10-13: DevOps (phone-app Phase 0 spike) to SDE / Architect for Phase 1
+- Spike **GO**: `.10x/reviews/2026-10-13-phone-app-spike.md`; code in `spikes/wasm-engine/`. Phase 1 scope: library,
+  NFKC hook, source-generated JSON. Done 2026-10-14.
+
 ### 2026-10-13: DevOps (phone-app plan) to SDE / Architect
-- Plan agreed; Phase 0 (spike) first. Superseded by the spike handoff above.
+- Plan agreed; Phase 0 (spike) first.
 
-## History
 ### 2026-10-13: DevOps (local-hosting) to SRE / the owner
 - Decisions: `.10x/decisions/devops/local-hosting.md`. Stack on the owner's PC at 127.0.0.1:8080, verified.
 - Tailscale was never set up: superseded by phone-app the same day.

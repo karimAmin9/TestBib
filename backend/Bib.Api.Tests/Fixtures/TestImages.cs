@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
-using Bib.Api.Conversion;
+using Bib.Conversion;
 
 namespace Bib.Api.Tests.Fixtures;
 

@@ -12,9 +12,7 @@ import {
   untracked,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { errorMessages } from '../../core/auth.service';
-import { BooksApi } from '../../core/books.api';
+import { LOADING_IMAGE, LocalLibrary, errorMessage } from '../../core/library.service';
 import { Chapter, ChapterRef, ContentBlock } from '../../core/models';
 import { ReaderSettingsService } from '../../core/reader-settings.service';
 import { Icon } from '../../shared/icon';
@@ -176,7 +174,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
                       aria-label="Show image full screen"
                     >
                       <img
-                        [src]="api.imageUrl(id(), block.src)"
+                        [src]="library.imageUrl(id(), block.src) ?? loadingImage"
                         [attr.width]="size.w"
                         [attr.height]="size.h"
                         loading="lazy"
@@ -264,7 +262,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
 
     @if (zoom(); as src) {
       <div class="lightbox" role="dialog" aria-label="Image" (click)="zoom.set(null)">
-        <img [src]="api.imageUrl(id(), src)" alt="" />
+        <img [src]="library.imageUrl(id(), src) ?? loadingImage" alt="" />
         <button type="button" class="lightbox-close" aria-label="Close">
           <app-icon name="close" [size]="26" />
         </button>
@@ -274,7 +272,8 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
   styleUrl: './reader.scss',
 })
 export class Reader {
-  protected readonly api = inject(BooksApi);
+  protected readonly library = inject(LocalLibrary);
+  protected readonly loadingImage = LOADING_IMAGE;
   protected readonly settings = inject(ReaderSettingsService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -324,17 +323,17 @@ export class Reader {
     this.zoom.set(null);
     if (this.loadedBookId !== id) {
       this.loadedBookId = id;
-      this.api.get(id).subscribe({
-        next: (d) => {
+      this.library.get(id).then(
+        (d) => {
           this.bookTitle.set(d.book.title);
-          this.chapters.set(d.chapters ?? []);
+          this.chapters.set(d.chapters);
         },
-        error: () => {},
-      });
+        () => {}, // the chapter request below reports the error
+      );
     }
 
     try {
-      const chapter = await firstValueFrom(this.api.chapter(id, n));
+      const chapter = await this.library.chapter(id, n);
       if (chapter.number !== this.n()) {
         return; // a newer navigation won
       }
@@ -349,7 +348,7 @@ export class Reader {
       );
     } catch (e) {
       this.chapter.set(null);
-      this.error.set(errorMessages(e)[0]!);
+      this.error.set(errorMessage(e));
     }
   }
 
@@ -406,7 +405,7 @@ export class Reader {
       return;
     }
     const value = Math.round(Math.min(100, Math.max(0, percent)) * 10) / 10;
-    this.api.saveProgress(this.id(), chapter.number, value).subscribe({ error: () => {} });
+    this.library.saveProgress(this.id(), chapter.number, value).catch(() => {});
   }
 
   private scrollable(): number {

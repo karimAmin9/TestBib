@@ -3,9 +3,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- ConversionJson uses reflection-based System.Text.Json, which trimming breaks (positional record parameter
-         names are stripped). The real app will use source-generated JSON; the spike measures speed untrimmed. -->
-    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
-    <PublishTrimmed>false</PublishTrimmed>
+    <!-- Trimmed (the default for publish). ConversionJson is source-generated; reflection-based JSON stays off so
+         anything that still relies on it fails here instead of silently on the phone. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 </Project>

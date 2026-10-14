@@ -1,5 +1,5 @@
-using Bib.Api.Conversion;
 using Bib.Api.Tests.Fixtures;
+using Bib.Conversion;
 
 namespace Bib.Api.Tests;
 
@@ -8,6 +8,18 @@ public sealed class TextNormalizerTests
     [Fact]
     public void Glyphs_splits_ligatures_and_drops_whitespace() =>
         Assert.Equal("officeflow", TextNormalizer.Glyphs("oﬃce ﬂow\n"));
+
+    [Fact]
+    public void Nfkc_splits_ligatures_and_composes_umlauts() =>
+        Assert.Equal("fish Über", TextNormalizer.Nfkc("ﬁsh Über"));
+
+    [Fact]
+    public void Nfkc_returns_ascii_text_as_is()
+    {
+        // ASCII is already NFKC: the (in the browser, cross-language) normalization call is skipped entirely.
+        const string text = "Plain ASCII, nothing to normalize.";
+        Assert.Same(text, TextNormalizer.Nfkc(text));
+    }
 
     [Theory]
     [InlineData("exam-", "ple", true)]

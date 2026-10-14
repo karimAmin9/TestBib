@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using System.IO.Hashing;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 /// <summary>Minimal PNG encoder for 8-bit RGB images (used for pages rendered by PDFium).</summary>
 public static class PngEncoder

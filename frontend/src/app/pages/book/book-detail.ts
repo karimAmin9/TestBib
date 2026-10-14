@@ -1,7 +1,6 @@
 import { DatePipe } from '@angular/common';
 import {
   Component,
-  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -10,12 +9,11 @@ import {
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { errorMessages } from '../../core/auth.service';
-import { BooksApi } from '../../core/books.api';
+import { LocalLibrary, errorMessage } from '../../core/library.service';
 import { BookDetail } from '../../core/models';
 import { BookCover } from '../../shared/book-cover';
 import { Icon } from '../../shared/icon';
@@ -108,10 +106,14 @@ export const CHAPTERS_PER_PAGE = 100;
             <div class="center">
               <div class="pills">
                 @if (b.status === 'Ready') {
-                  <app-verification-badge
-                    [status]="b.verificationStatus"
-                    [pagesWithIssues]="b.pagesWithIssues"
-                  />
+                  @if (b.verificationStatus === 'None') {
+                    <span class="pill neutral">Checking 1:1…</span>
+                  } @else {
+                    <app-verification-badge
+                      [status]="b.verificationStatus"
+                      [pagesWithIssues]="b.pagesWithIssues"
+                    />
+                  }
                 }
                 <span class="pill dot added">Added {{ b.createdAt | timeAgo }}</span>
               </div>
@@ -138,9 +140,11 @@ export const CHAPTERS_PER_PAGE = 100;
 
               @if (b.status === 'Failed') {
                 <p class="err">{{ b.error }}</p>
+                <button type="button" class="btn small" (click)="retry()">Convert again</button>
               } @else if (b.status === 'Processing') {
                 <p class="muted">
-                  The PDF is being converted and proof-read. This page updates automatically.
+                  The PDF is being converted on this device{{ converting() }}. You can keep using the app in the
+                  meantime.
                 </p>
               } @else if (b.excerpt) {
                 <p class="excerpt" [class.open]="excerptOpen()">{{ b.excerpt }}</p>
@@ -229,24 +233,31 @@ export const CHAPTERS_PER_PAGE = 100;
             @if (b.status === 'Ready') {
               <div class="side-block">
                 <h2 class="section-title">Conversion check</h2>
-                <div class="score">
-                  <span class="score-value">{{ verifiedPercent() }}%</span>
-                  <span class="muted small"
-                    >of {{ d.chapters.length }} pages<br />match the PDF 1:1</span
-                  >
-                </div>
-                <div class="stat-row">
-                  <span>✓ Verified</span><span class="muted">{{ counts().pass }}</span>
-                  <span class="bar ok"><span [style.width.%]="share(counts().pass)"></span></span>
-                </div>
-                <div class="stat-row">
-                  <span>⚠ With notes</span><span class="muted">{{ counts().warn }}</span>
-                  <span class="bar warn"><span [style.width.%]="share(counts().warn)"></span></span>
-                </div>
-                <div class="stat-row">
-                  <span>⚠ Differ</span><span class="muted">{{ counts().fail }}</span>
-                  <span class="bar bad"><span [style.width.%]="share(counts().fail)"></span></span>
-                </div>
+                @if (b.verificationStatus === 'None') {
+                  <div class="stat-row">
+                    <span>Checking pages…</span><span class="muted">{{ checked().done }} / {{ b.pageCount }}</span>
+                    <span class="bar"><span [style.width.%]="share(checked().done)"></span></span>
+                  </div>
+                } @else {
+                  <div class="score">
+                    <span class="score-value">{{ verifiedPercent() }}%</span>
+                    <span class="muted small"
+                      >of {{ d.chapters.length }} pages<br />match the PDF 1:1</span
+                    >
+                  </div>
+                  <div class="stat-row">
+                    <span>✓ Verified</span><span class="muted">{{ counts().pass }}</span>
+                    <span class="bar ok"><span [style.width.%]="share(counts().pass)"></span></span>
+                  </div>
+                  <div class="stat-row">
+                    <span>⚠ With notes</span><span class="muted">{{ counts().warn }}</span>
+                    <span class="bar warn"><span [style.width.%]="share(counts().warn)"></span></span>
+                  </div>
+                  <div class="stat-row">
+                    <span>⚠ Differ</span><span class="muted">{{ counts().fail }}</span>
+                    <span class="bar bad"><span [style.width.%]="share(counts().fail)"></span></span>
+                  </div>
+                }
                 <p class="muted small hint">
                   Every page is compared with the original PDF: all characters, words, word order
                   and images.
@@ -492,11 +503,11 @@ export const CHAPTERS_PER_PAGE = 100;
   `,
 })
 export class BookDetailPage {
-  protected readonly api = inject(BooksApi);
+  private readonly library = inject(LocalLibrary);
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
-  private pollTimer: ReturnType<typeof setTimeout> | undefined;
+  private loadedId: string | undefined;
 
   /** Route param. */
   readonly id = input.required<string>();
@@ -540,9 +551,27 @@ export class BookDetailPage {
   });
   protected readonly min = Math.min;
 
+  /** Progress of this book's conversion or 1:1 check, when one is running. */
+  private readonly ownConversion = computed(() => {
+    const c = this.library.conversion();
+    return c?.bookId === this.id() ? c : null;
+  });
+  protected readonly converting = computed(() => {
+    const c = this.ownConversion();
+    return c?.stage === 'processing' ? ` (page ${c.done} of ${c.total})` : '';
+  });
+  protected readonly checked = computed(() => {
+    const c = this.ownConversion();
+    return { done: c?.stage === 'verifying' ? c.done : 0 };
+  });
+
   constructor() {
-    effect(() => void this.load(this.id()));
-    inject(DestroyRef).onDestroy(() => clearTimeout(this.pollTimer));
+    // Load when the route changes, and again whenever the library changes (conversion finished, check done…).
+    effect(() => {
+      const id = this.id();
+      this.library.version();
+      untracked(() => void this.load(id));
+    });
   }
 
   protected share(count: number): number {
@@ -551,20 +580,20 @@ export class BookDetailPage {
   }
 
   private async load(id: string): Promise<void> {
-    clearTimeout(this.pollTimer);
     try {
-      const detail = await firstValueFrom(this.api.get(id));
+      const detail = await this.library.get(id);
       this.detail.set(detail);
-      afterNextRender(() => this.scrollToCurrentChapter(), { injector: this.injector });
-      const current = detail.book.progress?.chapterNumber;
-      if (current) {
-        this.chapterPage.set(Math.ceil(current / CHAPTERS_PER_PAGE));
-      }
-      if (detail.book.status === 'Processing') {
-        this.pollTimer = setTimeout(() => void this.load(id), 2000);
+      if (this.loadedId !== id) {
+        // Only on opening the book: later refreshes must not move the chapter list under the reader's finger.
+        this.loadedId = id;
+        afterNextRender(() => this.scrollToCurrentChapter(), { injector: this.injector });
+        const current = detail.book.progress?.chapterNumber;
+        if (current) {
+          this.chapterPage.set(Math.ceil(current / CHAPTERS_PER_PAGE));
+        }
       }
     } catch (e) {
-      this.error.set(errorMessages(e)[0]!);
+      this.error.set(errorMessage(e));
     }
   }
 
@@ -586,16 +615,23 @@ export class BookDetailPage {
 
   protected async save(): Promise<void> {
     try {
-      const updated = await firstValueFrom(
-        this.api.update(this.id(), { title: this.editTitle, author: this.editAuthor }),
-      );
+      const updated = await this.library.update(this.id(), { title: this.editTitle, author: this.editAuthor });
       this.detail.update((d) =>
         d ? { ...d, book: { ...d.book, title: updated.title, author: updated.author } } : d,
       );
       this.editing.set(false);
       this.error.set(null);
     } catch (e) {
-      this.error.set(errorMessages(e)[0]!);
+      this.error.set(errorMessage(e));
+    }
+  }
+
+  protected async retry(): Promise<void> {
+    try {
+      await this.library.retry(this.id());
+      this.error.set(null);
+    } catch (e) {
+      this.error.set(errorMessage(e));
     }
   }
 
@@ -605,10 +641,10 @@ export class BookDetailPage {
       return;
     }
     try {
-      await firstValueFrom(this.api.delete(this.id()));
+      await this.library.delete(this.id());
       await this.router.navigate(['/']);
     } catch (e) {
-      this.error.set(errorMessages(e)[0]!);
+      this.error.set(errorMessage(e));
     }
   }
 }

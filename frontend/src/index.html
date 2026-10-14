@@ -3,12 +3,21 @@
 <head>
   <meta charset="utf-8">
   <title>Bib</title>
-  <meta name="description" content="Your private PDF novel library">
+  <meta name="description" content="Your PDFs as readable books, converted and stored on your device">
+  <!--
+    Only this site's own files may run. 'wasm-unsafe-eval' lets the .NET conversion engine compile its WebAssembly;
+    blob: images are book images and covers from the on-device library.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#474747">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
   <app-root></app-root>
+  <noscript>Bib needs JavaScript to run.</noscript>
 </body>
 </html>

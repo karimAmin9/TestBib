@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { AuthService } from './core/auth.service';
+import { AppUpdates } from './core/app-updates';
 import { Icon } from './shared/icon';
 
 /**
@@ -15,60 +15,54 @@ import { Icon } from './shared/icon';
     <div class="shell">
       <aside class="rail" aria-label="Main navigation">
         <a class="logo" routerLink="/" aria-label="Bib library"><span>B</span></a>
-        @if (auth.user()) {
-          <nav class="rail-nav">
-            <a
-              routerLink="/"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              title="Library"
-            >
-              <app-icon name="book" [size]="22" />
-              <span class="sr-only">Library</span>
-            </a>
-            <a routerLink="/" fragment="upload" title="Upload a PDF">
-              <app-icon name="upload" [size]="22" />
-              <span class="sr-only">Upload a PDF</span>
-            </a>
-          </nav>
-          <div class="rail-bottom">
-            <span class="avatar" [title]="auth.user()!.email">{{ initial() }}</span>
-            <button type="button" class="rail-btn" (click)="logout()" title="Log out">
-              <app-icon name="logout" [size]="20" />
-              <span class="sr-only">Log out</span>
-            </button>
-          </div>
-        }
+        <nav class="rail-nav">
+          <a
+            routerLink="/"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+            title="Library"
+          >
+            <app-icon name="book" [size]="22" />
+            <span class="sr-only">Library</span>
+          </a>
+          <a routerLink="/" fragment="upload" title="Add a PDF">
+            <app-icon name="upload" [size]="22" />
+            <span class="sr-only">Add a PDF</span>
+          </a>
+        </nav>
       </aside>
 
       <header class="topbar">
         <a class="logo" routerLink="/" aria-label="Bib library"><span>B</span>ib</a>
-        @if (auth.user()) {
-          <button
-            type="button"
-            class="burger"
-            [attr.aria-expanded]="menuOpen()"
-            aria-controls="mobile-menu"
-            (click)="menuOpen.set(!menuOpen())"
-          >
-            <app-icon [name]="menuOpen() ? 'close' : 'menu'" [size]="28" />
-            <span class="sr-only">Menu</span>
-          </button>
-        }
+        <button
+          type="button"
+          class="burger"
+          [attr.aria-expanded]="menuOpen()"
+          aria-controls="mobile-menu"
+          (click)="menuOpen.set(!menuOpen())"
+        >
+          <app-icon [name]="menuOpen() ? 'close' : 'menu'" [size]="28" />
+          <span class="sr-only">Menu</span>
+        </button>
       </header>
 
-      @if (menuOpen() && auth.user()) {
+      @if (menuOpen()) {
         <nav id="mobile-menu" class="mobile-menu">
-          <span class="menu-user">{{ auth.user()!.email }}</span>
           <a routerLink="/"><app-icon name="book" />Library</a>
-          <a routerLink="/" fragment="upload"><app-icon name="upload" />Upload a PDF</a>
-          <button type="button" (click)="logout()"><app-icon name="logout" />Log out</button>
+          <a routerLink="/" fragment="upload"><app-icon name="upload" />Add a PDF</a>
         </nav>
       }
 
       <main class="content">
         <router-outlet />
       </main>
+
+      @if (updates.ready()) {
+        <div class="update" role="status">
+          <span>A new version of Bib is ready.</span>
+          <button type="button" class="btn small" (click)="updates.apply()">Update now</button>
+        </div>
+      }
     </div>
   `,
   styles: `
@@ -127,8 +121,7 @@ import { Icon } from './shared/icon';
       flex-direction: column;
       width: 100%;
     }
-    .rail-nav a,
-    .rail-btn {
+    .rail-nav a {
       display: grid;
       place-items: center;
       width: 100%;
@@ -143,7 +136,6 @@ import { Icon } from './shared/icon';
         background 0.15s;
     }
     .rail-nav a:hover,
-    .rail-btn:hover,
     .rail-nav a.active {
       color: var(--text-strong);
       background: rgba(0, 0, 0, 0.12);
@@ -151,32 +143,26 @@ import { Icon } from './shared/icon';
     .rail-nav a.active {
       box-shadow: inset 3px 0 0 var(--accent);
     }
-    .rail-bottom {
-      margin-top: auto;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      border-top: 1px solid var(--divider);
-    }
-    .rail-bottom .rail-btn {
-      border-bottom: 0;
-    }
-    .avatar {
-      display: grid;
-      place-items: center;
-      width: 34px;
-      height: 34px;
-      margin: 14px 0 4px;
-      border-radius: 50%;
-      background: var(--btn);
-      color: var(--text-strong);
-      font-weight: 700;
-      text-transform: uppercase;
-    }
     .topbar,
     .mobile-menu {
       display: none;
+    }
+    .update {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      z-index: 50;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: max-content;
+      max-width: calc(100vw - 32px);
+      padding: 10px 12px 10px 16px;
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      color: var(--text-strong);
     }
 
     @media (max-width: 760px) {
@@ -219,39 +205,25 @@ import { Icon } from './shared/icon';
         background: var(--panel-dark);
         box-shadow: var(--shadow);
       }
-      .mobile-menu a,
-      .mobile-menu button {
+      .mobile-menu a {
         display: flex;
         align-items: center;
         gap: 12px;
         min-height: 48px;
-        border: 0;
         border-bottom: 1px solid var(--divider);
-        background: none;
         color: var(--text);
-        font: inherit;
         font-weight: 700;
-        text-align: left;
         text-transform: uppercase;
         font-size: 13px;
-        cursor: pointer;
       }
-      .mobile-menu button {
+      .mobile-menu a:last-child {
         border-bottom: 0;
-        padding: 0;
-      }
-      .menu-user {
-        padding: 6px 0 10px;
-        color: var(--text-muted);
-        font-size: 12px;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
     }
   `,
 })
 export class App {
-  protected readonly auth = inject(AuthService);
+  protected readonly updates = inject(AppUpdates);
   private readonly router = inject(Router);
   protected readonly menuOpen = signal(false);
 
@@ -259,15 +231,5 @@ export class App {
     this.router.events
       .pipe(filter((e) => e instanceof NavigationEnd))
       .subscribe(() => this.menuOpen.set(false));
-  }
-
-  protected initial(): string {
-    return this.auth.user()?.email.charAt(0) ?? '?';
-  }
-
-  protected async logout(): Promise<void> {
-    this.menuOpen.set(false);
-    await this.auth.logout();
-    await this.router.navigate(['/login']);
   }
 }

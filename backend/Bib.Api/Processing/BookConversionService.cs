@@ -1,6 +1,6 @@
-using Bib.Api.Conversion;
 using Bib.Api.Data;
 using Bib.Api.Storage;
+using Bib.Conversion;
 using Microsoft.EntityFrameworkCore;
 
 namespace Bib.Api.Processing;
@@ -30,7 +30,7 @@ public sealed class BookConversionService(
             await db.Chapters.Where(c => c.BookId == bookId).ExecuteDeleteAsync(ct);
             storage.ResetOutput(bookId);
 
-            var processed = processor.Process(pdf, imagesDir, Path.GetFileNameWithoutExtension(book.OriginalFileName));
+            var processed = await processor.ProcessAsync(pdf, imagesDir, Path.GetFileNameWithoutExtension(book.OriginalFileName));
             db.Chapters.AddRange(processed.Chapters.Select(c => new Chapter
             {
                 BookId = bookId,

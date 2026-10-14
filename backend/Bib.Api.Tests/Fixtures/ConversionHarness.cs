@@ -1,4 +1,5 @@
-using Bib.Api.Conversion;
+using Bib.Api.Processing;
+using Bib.Conversion;
 
 namespace Bib.Api.Tests.Fixtures;
 
@@ -17,8 +18,9 @@ public sealed class ConversionHarness : IDisposable
 
     public ConversionVerifier Verifier { get; } = new();
 
+    // The PDFium renderer completes synchronously, so blocking here never waits on anything.
     public ProcessedBook Process(byte[] pdf, string fallbackTitle = "fallback") =>
-        Processor.Process(pdf, ImageDir, fallbackTitle);
+        Processor.ProcessAsync(pdf, ImageDir, fallbackTitle).GetAwaiter().GetResult();
 
     public VerificationReport Verify(byte[] pdf, IReadOnlyList<ProcessedChapter> chapters) =>
         Verifier.Verify(pdf, chapters, ImageDir);

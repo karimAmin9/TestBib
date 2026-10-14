@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 /// <summary>
 /// Proof-reads a conversion: re-opens the original PDF independently and checks, page by page,
@@ -16,7 +16,9 @@ public sealed partial class ConversionVerifier
     private const int MaxListedDiffs = 50;
     private const int MaxLcsWords = 6000;
 
-    public VerificationReport Verify(byte[] pdf, IReadOnlyList<ProcessedChapter> chapters, string imageDir)
+    /// <param name="pageDone">Called after each page with (page number, page count), for progress display.</param>
+    public VerificationReport Verify(
+        byte[] pdf, IReadOnlyList<ProcessedChapter> chapters, string imageDir, Action<int, int>? pageDone = null)
     {
         using var doc = PdfProcessor.Open(pdf);
         var notes = new List<string>();
@@ -44,6 +46,7 @@ public sealed partial class ConversionVerifier
             pages.Add(byNumber.TryGetValue(n, out var found)
                 ? VerifyPage(page, found[0], imageDir)
                 : new PageVerification { Page = n, Status = PageStatus.Fail, Notes = ["No chapter was stored for this page."] });
+            pageDone?.Invoke(n, doc.NumberOfPages);
         }
 
         var failed = pages.Count(p => p.Status == PageStatus.Fail);

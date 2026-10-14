@@ -10,7 +10,7 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.ReadingOrderDetector;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 using UglyToad.PdfPig.Exceptions;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 /// <summary>
 /// Converts a PDF into chapters (one per page) of paragraphs and images.
@@ -36,7 +36,9 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
 
     public static string ChapterTitle(int page) => $"Page {page}";
 
-    public ProcessedBook Process(byte[] pdf, string imageDir, string fallbackTitle)
+    /// <param name="pageDone">Called after each page with (page number, page count), for progress display.</param>
+    public async Task<ProcessedBook> ProcessAsync(
+        byte[] pdf, string imageDir, string fallbackTitle, Action<int, int>? pageDone = null)
     {
         Directory.CreateDirectory(imageDir);
 
@@ -49,11 +51,12 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         var chapters = new List<ProcessedChapter>(doc.NumberOfPages);
         for (var n = 1; n <= doc.NumberOfPages; n++)
         {
-            chapters.Add(ProcessPage(pdf, doc.GetPage(n), imageDir));
+            chapters.Add(await ProcessPageAsync(pdf, doc.GetPage(n), imageDir));
+            pageDone?.Invoke(n, doc.NumberOfPages);
         }
 
         var (title, author) = ReadMetadata(doc, fallbackTitle);
-        return new ProcessedBook(title, author, doc.NumberOfPages, chapters, TryRenderCover(pdf, doc));
+        return new ProcessedBook(title, author, doc.NumberOfPages, chapters, await TryRenderCoverAsync(pdf, doc));
     }
 
     public static PdfDocument Open(byte[] pdf)
@@ -72,11 +75,11 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         }
     }
 
-    private ProcessedChapter ProcessPage(byte[] pdf, Page page, string imageDir)
+    private async Task<ProcessedChapter> ProcessPageAsync(byte[] pdf, Page page, string imageDir)
     {
         var removed = new List<Removal>();
         var textBlocks = ExtractTextBlocks(page, removed);
-        var images = ExtractImages(pdf, page, imageDir);
+        var images = await ExtractImagesAsync(pdf, page, imageDir);
 
         // Merge images into the reading order by vertical position (PDF y grows upwards).
         var blocks = new List<ContentBlock>(textBlocks.Count + images.Count);
@@ -97,7 +100,7 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         if (blocks.Count == 0 && page.Letters.Count == 0 && page.Paths.Count > 0)
         {
             // Vector-only page (drawing, chart): keep it as a rendered image.
-            blocks.Add(RenderToFile(pdf, page, null, imageDir, PageImageFileName(page.Number)));
+            blocks.Add(await RenderToFileAsync(pdf, page, null, imageDir, PageImageFileName(page.Number)));
         }
 
         return new ProcessedChapter(page.Number, blocks, removed);
@@ -291,7 +294,8 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         return box.Bottom >= page.Height - margin || box.Top <= margin;
     }
 
-    private List<(double Top, double Left, ContentBlock Block)> ExtractImages(byte[] pdf, Page page, string imageDir)
+    private async Task<List<(double Top, double Left, ContentBlock Block)>> ExtractImagesAsync(
+        byte[] pdf, Page page, string imageDir)
     {
         var result = new List<(double, double, ContentBlock)>();
         var index = 0;
@@ -316,7 +320,7 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
             }
             else
             {
-                block = RenderToFile(pdf, page, image.BoundingBox, imageDir, ImageFileName(page.Number, index, "png"));
+                block = await RenderToFileAsync(pdf, page, image.BoundingBox, imageDir, ImageFileName(page.Number, index, "png"));
             }
 
             result.Add((image.BoundingBox.Top, image.BoundingBox.Left, block));
@@ -325,9 +329,10 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         return result;
     }
 
-    private ContentBlock RenderToFile(byte[] pdf, Page page, PdfRectangle? region, string imageDir, string name)
+    private async Task<ContentBlock> RenderToFileAsync(
+        byte[] pdf, Page page, PdfRectangle? region, string imageDir, string name)
     {
-        var rendered = renderer.Render(pdf, page.Number - 1, FallbackRenderScale);
+        var rendered = await renderer.RenderAsync(pdf, page.Number - 1, FallbackRenderScale);
         if (region is { } r)
         {
             var sx = rendered.Width / page.Width;
@@ -352,7 +357,7 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         };
     }
 
-    private byte[]? TryRenderCover(byte[] pdf, PdfDocument doc)
+    private async Task<byte[]?> TryRenderCoverAsync(byte[] pdf, PdfDocument doc)
     {
         if (doc.NumberOfPages == 0)
         {
@@ -362,7 +367,7 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         try
         {
             var first = doc.GetPage(1);
-            return renderer.Render(pdf, 0, CoverWidth / first.Width).ToPng();
+            return (await renderer.RenderAsync(pdf, 0, CoverWidth / first.Width)).ToPng();
         }
         catch (Exception)
         {

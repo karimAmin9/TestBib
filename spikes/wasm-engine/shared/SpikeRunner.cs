@@ -2,8 +2,9 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Bib.Conversion;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Spike;
 
 /// <summary>Processor + verifier exactly as BookConversionService runs them, with timings and an output fingerprint.</summary>
 public static class SpikeRunner
@@ -15,7 +16,8 @@ public static class SpikeRunner
         {
             var total = Stopwatch.StartNew();
             var sw = Stopwatch.StartNew();
-            var book = new PdfProcessor(new BlankPageRenderer()).Process(pdf, imageDir, "spike");
+            // BlankPageRenderer completes synchronously, so this never blocks on JavaScript.
+            var book = new PdfProcessor(new BlankPageRenderer()).ProcessAsync(pdf, imageDir, "spike").GetAwaiter().GetResult();
             var processMs = sw.ElapsedMilliseconds;
 
             // Verify what would be stored (JSON round trip), like BookConversionService does.

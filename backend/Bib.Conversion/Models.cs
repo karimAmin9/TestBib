@@ -1,7 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 public static class BlockTypes
 {
@@ -92,13 +93,26 @@ public sealed record VerificationReport
 
 public static class ConversionJson
 {
-    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
+    public static readonly JsonSerializerOptions Options = ConversionJsonContext.Default.Options;
 
-    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Options);
+    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, TypeInfo<T>());
 
     public static T Deserialize<T>(string json) =>
-        JsonSerializer.Deserialize<T>(json, Options) ?? throw new InvalidOperationException("Invalid stored JSON.");
+        JsonSerializer.Deserialize(json, TypeInfo<T>()) ?? throw new InvalidOperationException("Invalid stored JSON.");
+
+    private static JsonTypeInfo<T> TypeInfo<T>() => (JsonTypeInfo<T>)Options.GetTypeInfo(typeof(T));
 }
+
+/// <summary>
+/// Source-generated (trim-safe) JSON metadata for everything stored as JSON; register new stored types here.
+/// Reflection-based serialization breaks in the trimmed browser build.
+/// </summary>
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(IReadOnlyList<ContentBlock>))]
+[JsonSerializable(typeof(List<ContentBlock>))]
+[JsonSerializable(typeof(IReadOnlyList<Removal>))]
+[JsonSerializable(typeof(List<Removal>))]
+[JsonSerializable(typeof(IReadOnlyList<ProcessedChapter>))]
+[JsonSerializable(typeof(VerificationReport))]
+[JsonSerializable(typeof(PageVerification))]
+internal sealed partial class ConversionJsonContext : JsonSerializerContext;

@@ -1,5 +1,5 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
-import { BooksApi } from '../core/books.api';
+import { LOADING_IMAGE, LocalLibrary } from '../core/library.service';
 import { BookSummary } from '../core/models';
 
 /** Book cover image, or a generated placeholder while there is none. */
@@ -8,7 +8,7 @@ import { BookSummary } from '../core/models';
   template: `
     @if (book().hasCover && !failed()) {
       <img
-        [src]="api.coverUrl(book().id)"
+        [src]="library.coverUrl(book().id) ?? loadingImage"
         [alt]="alt() ? 'Cover of ' + book().title : ''"
         loading="lazy"
         (error)="failed.set(true)"
@@ -45,7 +45,8 @@ import { BookSummary } from '../core/models';
   `,
 })
 export class BookCover {
-  protected readonly api = inject(BooksApi);
+  protected readonly library = inject(LocalLibrary);
+  protected readonly loadingImage = LOADING_IMAGE;
   readonly book = input.required<Pick<BookSummary, 'id' | 'title' | 'hasCover'>>();
   /** Decorative covers (next to a visible title) get an empty alt text. */
   readonly alt = input(false);

@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Bib.Api.Conversion;
+namespace Bib.Conversion;
 
 /// <summary>
 /// Text normalization shared by <see cref="PdfProcessor"/> and <see cref="ConversionVerifier"/>
@@ -12,10 +12,19 @@ public static partial class TextNormalizer
 {
     public const char SoftHyphen = '­';
 
+    /// <summary>
+    /// The NFKC implementation. .NET in the browser (WebAssembly) does not support NFKC, so the browser host sets this
+    /// once at startup to JavaScript's <c>String.prototype.normalize('NFKC')</c>.
+    /// </summary>
+    public static Func<string, string> NfkcImplementation { get; set; } = text => text.Normalize(NormalizationForm.FormKC);
+
+    /// <summary>NFKC (splits ligatures such as "ﬁ" into "fi"). ASCII is already NFKC and is returned as is.</summary>
+    public static string Nfkc(string text) => Ascii.IsValid(text) ? text : NfkcImplementation(text);
+
     /// <summary>NFKC (splits ligatures such as "ﬁ" into "fi") with all whitespace removed.</summary>
     public static string Glyphs(string text)
     {
-        var normalized = text.Normalize(NormalizationForm.FormKC);
+        var normalized = Nfkc(text);
         var sb = new StringBuilder(normalized.Length);
         foreach (var ch in normalized)
         {
@@ -30,7 +39,7 @@ public static partial class TextNormalizer
 
     /// <summary>Splits text into NFKC-normalized, whitespace separated words.</summary>
     public static IReadOnlyList<string> Words(string text) =>
-        text.Normalize(NormalizationForm.FormKC)
+        Nfkc(text)
             .Replace(SoftHyphen.ToString(), "")
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
