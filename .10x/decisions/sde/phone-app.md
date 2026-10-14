@@ -48,6 +48,40 @@
 - pdf.js runs on the main thread: rendering a page briefly blocks the UI (covers, drawing pages, undecodable images only).
 - The lab page and its `?pdf=` loader are test tooling; remove or hide them once Phase 3 has the real library flow.
 
+## Phase 3: local library (2026-10-14)
+- **`core/db.ts`**: IndexedDB `bib` v1, stores `books` (BookSummary + originalFileName), `chapters` [bookId, number],
+  `files` [bookId, name] (source.pdf, cover.png, images; bytes as ArrayBuffer), `reports` (bookId). Every schema
+  change: bump `DB_VERSION`, add an `upgrade` step. `transaction()` helper: only IndexedDB requests may be awaited
+  inside (anything else auto-commits the transaction). `LIBRARY_DB` token for tests.
+- **`core/library.service.ts` `LocalLibrary`** replaces `BooksApi`, mirroring the server: add (validates PDF type,
+  size ≤ 100 MB, `%PDF-` header; stores record + source PDF; queues), conversion via `BibEngine` (book `Ready` with
+  verification `None` as soon as it is converted, report and status afterwards), retry, update/progress validation
+  (server messages), delete (everything, also mid-conversion: writes check that the book still exists),
+  resume on startup (`Processing`, or `Ready` + `None` = check never finished), `navigator.storage.persist()`.
+  Pages re-read on `version` (bumped after every write) instead of polling; `conversion` signal = live progress.
+  Covers/images as object URLs (signal-backed cache; every cover, but only one book's images, are kept).
+  Excerpt and title-from-file-name ported from the server.
+- **UI**: no login (auth service/guards/interceptor, login page, HttpClient, BooksApi and the lab page are gone);
+  library "Add a PDF", card "Converting 45/270" / "Checking 1:1…"; book page check progress and "Convert again";
+  reader images from the device.
+- **Tests**: `library.service.spec.ts` (fake-indexeddb 6.2.5, dev dependency) covers conversion, readable-before-check,
+  object URLs, failure + retry, delete mid-conversion, resume, validation, PDF-only. Page specs use a stand-in library.
+  Frontend 46/46.
+
+### Verified (Phase 3, in the browser)
+- Added 3 PDFs by drop: queued one at a time, live "Converting n/270", all **Verified 1:1**; page reload in the
+  middle of a conversion → resumed automatically and finished.
+- Reader shows images from IndexedDB (byte sizes identical to the server's output); progress survives a full reload
+  ("Continue: Page 2"); delete leaves no records in any store; book page shows 100% of 270 pages verified.
+- Production build: initial bundle 77 kB (was 84 kB; HttpClient gone).
+
+### Notes / tech debt (Phase 3)
+- Memory: adding a PDF holds it in memory several times (File → stored copy → engine and pdf.js copies). Fine for
+  typical books; check 100 MB files on the phone (Phase 5).
+- The Docker/nginx frontend now serves this local app, but its CSP lacks `'wasm-unsafe-eval'` and `blob:` images,
+  so conversion would fail there. Not fixed: Phase 4 sets the CSP for GitHub Pages and Phase 5 removes Docker.
+- `proxy.conf.json` and the backend are unused by the app; removed in Phase 5.
+
 ## Verified (Phase 1)
 - `dotnet build backend/Bib.slnx`: 0 warnings (trim analyzer on).
 - Native and trimmed-browser fingerprints identical to Phase 0 for all five spike PDFs; browser speed unchanged
