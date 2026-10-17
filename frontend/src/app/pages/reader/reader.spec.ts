@@ -7,17 +7,19 @@ import { PROGRESS_DEBOUNCE_MS, Reader, displaySize } from './reader';
 function chapter(overrides: Partial<Chapter> = {}): Chapter {
   return {
     number: 2,
-    title: 'Page 2',
+    title: 'The Second Chapter',
     total: 3,
     prev: 1,
     next: 3,
+    firstPage: 4,
+    lastPage: 5,
     blocks: [
       { type: 'h', text: 'Chapter Two' },
       { type: 'p', text: 'First paragraph.' },
       { type: 'img', src: 'p2-1.jpg', w: 64, h: 48 },
       { type: 'p', text: 'Second paragraph.' },
     ],
-    verification: null,
+    issues: [],
     ...overrides,
   };
 }
@@ -89,8 +91,61 @@ describe('Reader', () => {
     const img = el(f).querySelector('figure img') as HTMLImageElement;
     expect(img.getAttribute('src')).toBe('blob:b1/p2-1.jpg');
     expect(img.getAttribute('width')).toBe('64');
-    expect(el(f).querySelector('h1')!.textContent).toContain('Page 2');
-    expect(el(f).textContent).toContain('The Lighthouse');
+    expect(el(f).querySelector('h1')!.textContent).toContain('The Second Chapter');
+    expect(el(f).querySelector('.chapter-book')!.textContent).toContain('The Lighthouse · Pages 4–5 of the PDF');
+  });
+
+  it('shows a paragraph that runs across pages as one, and images with their captions', async () => {
+    const f = await open(
+      chapter({
+        blocks: [
+          { type: 'p', text: 'Man kann ziem-', role: 'body' },
+          { type: 'p', text: 'lich leicht sehen.', role: 'body', cont: true },
+          { type: 'img', src: 'p4-1.jpg', figure: 'f1' },
+          { type: 'p', text: 'Links: Freud, 1909.', role: 'caption', figure: 'f1' },
+          { type: 'p', text: 'Oben: ein Turm.', role: 'caption' },
+        ],
+      }),
+    );
+
+    const paragraphs = Array.from(el(f).querySelectorAll('article > p'));
+    expect(paragraphs.map((p) => p.textContent)).toEqual(['Man kann ziemlich leicht sehen.', 'Oben: ein Turm.']);
+    expect(paragraphs[1]!.classList).toContain('caption');
+    expect(el(f).querySelector('figure img')!.getAttribute('src')).toBe('blob:b1/p4-1.jpg');
+    expect(el(f).querySelector('figure figcaption')!.textContent).toBe('Links: Freud, 1909.');
+  });
+
+  it('goes on with the paragraph after a picture placed in it', async () => {
+    const f = await open(
+      chapter({
+        blocks: [
+          { type: 'p', text: 'Der Text läuft weiter,', role: 'body' },
+          { type: 'img', src: 'p4-1.jpg', figure: 'f1' },
+          { type: 'p', text: 'und weiter.', role: 'body', cont: true },
+        ],
+      }),
+    );
+
+    const paragraphs = Array.from(el(f).querySelectorAll('article > p'));
+    expect(paragraphs.map((p) => [p.textContent, p.classList.contains('continued')])).toEqual([
+      ['Der Text läuft weiter,', false],
+      ['und weiter.', true],
+    ]);
+  });
+
+  it('marks scan fixes and shows the original on tap', async () => {
+    const f = await open(
+      chapter({ blocks: [{ type: 'p', text: 'das letzte W7ort.', fixes: [{ at: 11, len: 5, to: 'Wort' }] }] }),
+    );
+
+    const paragraph = el(f).querySelector('article > p')!;
+    expect(paragraph.textContent).toBe('das letzte Wort.');
+    const fix = paragraph.querySelector<HTMLButtonElement>('button.fix')!;
+    expect(fix.title).toContain('W7ort');
+
+    fix.click();
+    await f.whenStable();
+    expect(paragraph.textContent).toBe('das letzte W7ort.');
   });
 
   it('renders text without interpreting HTML', async () => {
@@ -112,7 +167,7 @@ describe('Reader', () => {
     expect(navigate).toHaveBeenCalledWith(['/book', 'b1', 'read', 1]);
   });
 
-  it('disables previous on the first page', async () => {
+  it('disables previous on the first chapter', async () => {
     const f = await open(chapter({ number: 1, prev: null, next: 2 }));
     const buttons = el(f).querySelectorAll<HTMLButtonElement>('.bottom-nav button');
 
@@ -120,7 +175,7 @@ describe('Reader', () => {
     expect(buttons[1]!.disabled).toBe(false);
   });
 
-  it('disables next on the last page', async () => {
+  it('disables next on the last chapter', async () => {
     const f = await open(chapter({ number: 3, prev: 2, next: null }));
     const buttons = el(f).querySelectorAll<HTMLButtonElement>('.bottom-nav button');
 
@@ -141,25 +196,25 @@ describe('Reader', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('shows a dismissible note when the page differs from the PDF', async () => {
-    const f = await open(chapter({ verification: failedPage() }));
+  it('shows a dismissible note when pages of the chapter differ from the PDF', async () => {
+    const f = await open(chapter({ issues: [failedPage()] }));
 
     const note = el(f).querySelector('.note')!;
     expect(note.textContent).toContain('does not match the PDF exactly');
-    expect(note.textContent).toContain('Missing: keeper');
+    expect(note.textContent).toContain('Page 2: missing: keeper; missing characters: e');
 
     (note.querySelector('.close') as HTMLButtonElement).click();
     await f.whenStable();
     expect(el(f).querySelector('.note')).toBeNull();
   });
 
-  it('does not show a note for verified pages', async () => {
-    const f = await open(chapter({ verification: { ...failedPage(), status: 'Pass' } }));
+  it('does not show a note when every page was verified', async () => {
+    const f = await open(chapter({ issues: [] }));
 
     expect(el(f).querySelector('.note')).toBeNull();
   });
 
-  it('saves progress when a page opens and once after scrolling stops', async () => {
+  it('saves progress when a chapter opens and once after scrolling stops', async () => {
     const f = await open();
     expect(progressSaves()).toEqual([['b1', 2, 0]]);
     library.saveProgress.mockClear();

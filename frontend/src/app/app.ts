@@ -29,6 +29,10 @@ import { Icon } from './shared/icon';
             <app-icon name="upload" [size]="22" />
             <span class="sr-only">Add a PDF</span>
           </a>
+          <a routerLink="/settings" routerLinkActive="active" title="Settings">
+            <app-icon name="gear" [size]="22" />
+            <span class="sr-only">Settings</span>
+          </a>
         </nav>
       </aside>
 
@@ -50,6 +54,7 @@ import { Icon } from './shared/icon';
         <nav id="mobile-menu" class="mobile-menu">
           <a routerLink="/"><app-icon name="book" />Library</a>
           <a routerLink="/" fragment="upload"><app-icon name="upload" />Add a PDF</a>
+          <a routerLink="/settings"><app-icon name="gear" />Settings</a>
         </nav>
       }
 

@@ -13,8 +13,11 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { AiSettingsService } from '../../core/ai-settings.service';
 import { LocalLibrary, errorMessage } from '../../core/library.service';
 import { BookDetail } from '../../core/models';
+import { estimateCost, formatDollars, modelInfo } from '../../organize/pricing';
+import { pageRange } from '../reader/reading';
 import { BookCover } from '../../shared/book-cover';
 import { Icon } from '../../shared/icon';
 import { TimeAgoPipe } from '../../shared/time-ago';
@@ -70,6 +73,12 @@ export const CHAPTERS_PER_PAGE = 100;
                   <dt>Pages:</dt>
                   <dd>{{ b.pageCount }}</dd>
                 </div>
+                @if (b.status === 'Ready') {
+                  <div>
+                    <dt>Chapters:</dt>
+                    <dd>{{ b.chapterCount }}</dd>
+                  </div>
+                }
                 <div>
                   <dt>Added:</dt>
                   <dd>{{ b.createdAt | date: 'mediumDate' }}</dd>
@@ -95,7 +104,7 @@ export const CHAPTERS_PER_PAGE = 100;
                     <dt>Reading:</dt>
                     <dd>
                       <a [routerLink]="['/book', b.id, 'read', p.chapterNumber]"
-                        >Page {{ p.chapterNumber }}</a
+                        >Chapter {{ p.chapterNumber }}</a
                       >
                     </dd>
                   </div>
@@ -114,6 +123,16 @@ export const CHAPTERS_PER_PAGE = 100;
                       [pagesWithIssues]="b.pagesWithIssues"
                     />
                   }
+                }
+                @if (b.organizedBy === 'ai') {
+                  <span class="pill neutral" title="Chapters, captions and paragraphs arranged by Claude">
+                    Arranged by Claude
+                  </span>
+                }
+                @if (b.fixCount > 0) {
+                  <span class="pill neutral" title="Scan errors corrected; tap an underlined word to see the original">
+                    {{ b.fixCount }} scan {{ b.fixCount === 1 ? 'fix' : 'fixes' }}
+                  </span>
                 }
                 <span class="pill dot added">Added {{ b.createdAt | timeAgo }}</span>
               </div>
@@ -154,9 +173,45 @@ export const CHAPTERS_PER_PAGE = 100;
               }
 
               @if (b.status === 'Ready') {
+                <div class="organize" [class.warn]="b.organizeError">
+                  @if (organizing(); as o) {
+                    <p>
+                      Claude is arranging the chapters{{ o.total ? ' (part ' + o.done + ' of ' + o.total + ')' : '' }}…
+                      You can keep reading meanwhile.
+                    </p>
+                  } @else if (verifying()) {
+                    <p class="muted">Checking the chapters against the PDF…</p>
+                  } @else {
+                    @if (b.organizedBy === 'ai') {
+                      <p class="muted">
+                        Chapters, captions and paragraphs arranged by Claude{{
+                          b.aiCost !== null ? ' (cost ' + dollars(b.aiCost) + ')' : ''
+                        }}.
+                      </p>
+                    } @else {
+                      <p class="muted">Chapters arranged by the layout rules.</p>
+                    }
+                    @if (b.organizeError) {
+                      <p class="err">{{ b.organizeError }}</p>
+                    }
+                    @if (b.organizedBy !== 'ai' || b.organizeError) {
+                      @if (ai.enabled()) {
+                        <button type="button" class="btn small" (click)="organize()">
+                          Organize with Claude<span class="muted">≈ {{ estimate() }}</span>
+                        </button>
+                      } @else {
+                        <p class="muted small">
+                          <a routerLink="/settings">Add a Claude API key</a> to have Claude keep text, images and
+                          their captions together and arrange real chapters.
+                        </p>
+                      }
+                    }
+                  }
+                </div>
+
                 <div class="chapters-head" id="chapters">
                   <h2 class="section-title">Chapters</h2>
-                  <span class="muted small">{{ d.chapters.length }} pages</span>
+                  <span class="muted small">{{ d.chapters.length }} chapters · {{ b.pageCount }} pages</span>
                 </div>
                 <ol class="chapter-list">
                   @for (c of visibleChapters(); track c.number) {
@@ -176,6 +231,9 @@ export const CHAPTERS_PER_PAGE = 100;
                           [class.warn]="c.verification === 'Warning'"
                           [class.bad]="c.verification === 'Fail'"
                         >
+                          @if (range(c.firstPage, c.lastPage); as r) {
+                            {{ r }} ·
+                          }
                           @switch (c.verification) {
                             @case ('Pass') {
                               ✓ Verified
@@ -235,39 +293,40 @@ export const CHAPTERS_PER_PAGE = 100;
                 <h2 class="section-title">Conversion check</h2>
                 @if (b.verificationStatus === 'None') {
                   <div class="stat-row">
-                    <span>Checking pages…</span><span class="muted">{{ checked().done }} / {{ b.pageCount }}</span>
+                    <span>{{ organizing() ? 'Waiting for Claude…' : 'Checking pages…' }}</span
+                    ><span class="muted">{{ checked().done }} / {{ b.pageCount }}</span>
                     <span class="bar"><span [style.width.%]="share(checked().done)"></span></span>
                   </div>
                 } @else {
                   <div class="score">
                     <span class="score-value">{{ verifiedPercent() }}%</span>
                     <span class="muted small"
-                      >of {{ d.chapters.length }} pages<br />match the PDF 1:1</span
+                      >of {{ b.pageCount }} pages<br />match the PDF 1:1</span
                     >
                   </div>
                   <div class="stat-row">
-                    <span>✓ Verified</span><span class="muted">{{ counts().pass }}</span>
-                    <span class="bar ok"><span [style.width.%]="share(counts().pass)"></span></span>
+                    <span>✓ Verified</span><span class="muted">{{ d.pageChecks.pass }}</span>
+                    <span class="bar ok"><span [style.width.%]="share(d.pageChecks.pass)"></span></span>
                   </div>
                   <div class="stat-row">
-                    <span>⚠ With notes</span><span class="muted">{{ counts().warn }}</span>
-                    <span class="bar warn"><span [style.width.%]="share(counts().warn)"></span></span>
+                    <span>⚠ With notes</span><span class="muted">{{ d.pageChecks.warn }}</span>
+                    <span class="bar warn"><span [style.width.%]="share(d.pageChecks.warn)"></span></span>
                   </div>
                   <div class="stat-row">
-                    <span>⚠ Differ</span><span class="muted">{{ counts().fail }}</span>
-                    <span class="bar bad"><span [style.width.%]="share(counts().fail)"></span></span>
+                    <span>⚠ Differ</span><span class="muted">{{ d.pageChecks.fail }}</span>
+                    <span class="bar bad"><span [style.width.%]="share(d.pageChecks.fail)"></span></span>
                   </div>
                 }
                 <p class="muted small hint">
                   Every page is compared with the original PDF: all characters, words, word order
-                  and images.
+                  and images. Scan fixes are marked in the text and don't change what is compared.
                 </p>
               </div>
 
               <div class="side-block">
                 <h2 class="section-title">Your progress</h2>
                 <div class="stat-row">
-                  <span>Page {{ b.progress?.chapterNumber ?? 0 }} of {{ b.pageCount }}</span>
+                  <span>Chapter {{ b.progress?.chapterNumber ?? 0 }} of {{ b.chapterCount }}</span>
                   <span class="muted">{{ readPercent() }}%</span>
                   <span class="bar ok"><span [style.width.%]="readPercent()"></span></span>
                 </div>
@@ -461,6 +520,26 @@ export const CHAPTERS_PER_PAGE = 100;
     .hint {
       margin: 12px 0 0;
     }
+    .organize {
+      margin-top: 20px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      background: var(--panel-dark);
+      font-size: 13px;
+    }
+    .organize.warn {
+      border-left: 4px solid var(--warn-fg);
+    }
+    .organize p {
+      margin: 0 0 8px;
+    }
+    .organize p:last-child {
+      margin-bottom: 0;
+    }
+    .organize .btn .muted {
+      margin-left: 8px;
+      font-weight: 400;
+    }
     .manage {
       display: flex;
       flex-direction: column;
@@ -504,6 +583,7 @@ export const CHAPTERS_PER_PAGE = 100;
 })
 export class BookDetailPage {
   private readonly library = inject(LocalLibrary);
+  protected readonly ai = inject(AiSettingsService);
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -531,25 +611,24 @@ export class BookDetailPage {
     const start = (this.chapterPage() - 1) * CHAPTERS_PER_PAGE;
     return this.detail()?.chapters.slice(start, start + CHAPTERS_PER_PAGE) ?? [];
   });
-  protected readonly counts = computed(() => {
-    const chapters = this.detail()?.chapters ?? [];
-    return {
-      pass: chapters.filter((c) => c.verification === 'Pass').length,
-      warn: chapters.filter((c) => c.verification === 'Warning').length,
-      fail: chapters.filter((c) => c.verification === 'Fail').length,
-    };
-  });
   protected readonly verifiedPercent = computed(() => {
-    const total = this.detail()?.chapters.length ?? 0;
-    return total ? Math.floor((100 * this.counts().pass) / total) : 0;
+    const total = this.detail()?.book.pageCount ?? 0;
+    return total ? Math.floor((100 * (this.detail()?.pageChecks.pass ?? 0)) / total) : 0;
   });
   protected readonly readPercent = computed(() => {
     const b = this.detail()?.book;
-    return b?.progress && b.pageCount
-      ? Math.round((100 * b.progress.chapterNumber) / b.pageCount)
+    return b?.progress && b.chapterCount
+      ? Math.round((100 * b.progress.chapterNumber) / b.chapterCount)
       : 0;
   });
+  /** What organizing this book with the chosen model should cost. */
+  protected readonly estimate = computed(() => {
+    const model = modelInfo(this.ai.settings().model);
+    return model ? formatDollars(estimateCost(this.detail()?.book.pageCount ?? 0, model)) : '';
+  });
   protected readonly min = Math.min;
+  protected readonly range = pageRange;
+  protected readonly dollars = formatDollars;
 
   /** Progress of this book's conversion or 1:1 check, when one is running. */
   private readonly ownConversion = computed(() => {
@@ -564,6 +643,11 @@ export class BookDetailPage {
     const c = this.ownConversion();
     return { done: c?.stage === 'verifying' ? c.done : 0 };
   });
+  protected readonly organizing = computed(() => {
+    const c = this.ownConversion();
+    return c?.stage === 'organizing' ? c : null;
+  });
+  protected readonly verifying = computed(() => this.ownConversion()?.stage === 'verifying');
 
   constructor() {
     // Load when the route changes, and again whenever the library changes (conversion finished, check done…).
@@ -575,7 +659,7 @@ export class BookDetailPage {
   }
 
   protected share(count: number): number {
-    const total = this.detail()?.chapters.length ?? 0;
+    const total = this.detail()?.book.pageCount ?? 0;
     return total ? (100 * count) / total : 0;
   }
 
@@ -620,6 +704,19 @@ export class BookDetailPage {
         d ? { ...d, book: { ...d.book, title: updated.title, author: updated.author } } : d,
       );
       this.editing.set(false);
+      this.error.set(null);
+    } catch (e) {
+      this.error.set(errorMessage(e));
+    }
+  }
+
+  protected async organize(): Promise<void> {
+    const b = this.detail()?.book;
+    if (b && !confirm(`Organize “${b.title}” with Claude? This uses your API key and costs about ${this.estimate()}.`)) {
+      return;
+    }
+    try {
+      await this.library.organizeWithAI(this.id());
       this.error.set(null);
     } catch (e) {
       this.error.set(errorMessage(e));

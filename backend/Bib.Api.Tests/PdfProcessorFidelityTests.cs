@@ -60,6 +60,56 @@ public sealed class PdfProcessorFidelityTests : IDisposable
     }
 
     [Fact]
+    public void Book_paragraphs_without_gaps_are_split_at_their_indented_first_line()
+    {
+        var pdf = new FixturePdf()
+            .Page(p => p.BookText(
+                24,
+                justify: false,
+                ["The dream is a piece of the unconscious mind,", "said Jung."],
+                ["Freud saw it differently. He took the", "dream for a facade."],
+                ["Both were partly right."]))
+            .Build();
+
+        var chapter = _h.Process(pdf).Chapters[0];
+
+        Assert.Equal(
+            [
+                "The dream is a piece of the unconscious mind, said Jung.",
+                "Freud saw it differently. He took the dream for a facade.",
+                "Both were partly right.",
+            ],
+            ConversionHarness.Paragraphs(chapter));
+        AssertVerified(pdf, _h.Process(pdf));
+    }
+
+    [Fact]
+    public void Justified_paragraphs_are_split_where_a_line_ends_short_not_at_every_full_stop()
+    {
+        var pdf = new FixturePdf()
+            .Page(p => p.BookText(
+                0,
+                justify: true,
+                [
+                    "The dream is a piece of the unconscious mind, said Jung, and it",
+                    "speaks in images. We have to learn the language of these images.",
+                    "That is all.",
+                ],
+                ["Freud saw it quite differently from his pupil, who admired him, and", "took the dream for a facade."]))
+            .Build();
+
+        var chapter = _h.Process(pdf).Chapters[0];
+
+        Assert.Equal(
+            [
+                "The dream is a piece of the unconscious mind, said Jung, and it speaks in images. We have to learn the language of these images. That is all.",
+                "Freud saw it quite differently from his pupil, who admired him, and took the dream for a facade.",
+            ],
+            ConversionHarness.Paragraphs(chapter));
+        AssertVerified(pdf, _h.Process(pdf));
+    }
+
+    [Fact]
     public void Hyphenated_line_breaks_are_joined_and_the_hyphen_is_recorded()
     {
         var pdf = new FixturePdf()

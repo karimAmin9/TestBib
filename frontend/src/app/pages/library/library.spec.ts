@@ -11,6 +11,7 @@ function book(overrides: Partial<BookSummary> = {}): BookSummary {
     title: 'The Lighthouse',
     author: 'A. Keeper',
     pageCount: 12,
+    chapterCount: 6,
     status: 'Ready',
     error: null,
     verificationStatus: 'Verified',
@@ -19,6 +20,10 @@ function book(overrides: Partial<BookSummary> = {}): BookSummary {
     hasCover: false,
     createdAt: '2026-10-12T08:00:00Z',
     progress: null,
+    organizedBy: 'rules',
+    organizeError: null,
+    fixCount: 0,
+    aiCost: null,
     ...overrides,
   };
 }
@@ -67,7 +72,8 @@ describe('Library', () => {
 
     expect(fixture.nativeElement.querySelectorAll('app-book-card').length).toBe(1);
     expect(text(fixture)).toContain('The Lighthouse');
-    expect(text(fixture)).toContain('Continue: Page 5');
+    expect(text(fixture)).toContain('Continue: Chapter 5');
+    expect(text(fixture)).toContain('6 chapters · 12 pages');
     expect(text(fixture)).toContain('Verified 1:1');
   });
 
@@ -96,6 +102,17 @@ describe('Library', () => {
 
     expect(text(fixture)).toContain('Converting 45/270');
     expect(text(fixture)).toContain('Checking 1:1…');
+
+    library.conversion.set({ bookId: 'b', stage: 'organizing', done: 3, total: 27 });
+    await fixture.whenStable();
+    expect(text(fixture)).toContain('Claude 3/27');
+  });
+
+  it('marks books arranged by Claude', async () => {
+    library.books = [book({ organizedBy: 'ai' })];
+    const fixture = await create();
+
+    expect(fixture.nativeElement.querySelector('.meta')!.textContent).toContain('Claude');
   });
 
   it('adds a PDF to the library', async () => {

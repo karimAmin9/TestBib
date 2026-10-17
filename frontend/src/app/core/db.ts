@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import type { CachedChunk } from '../organize/claude';
 import { BookSummary, ContentBlock, VerificationReport } from './models';
 
 /**
@@ -6,20 +7,31 @@ import { BookSummary, ContentBlock, VerificationReport } from './models';
  * an older version of the app are migrated when the app updates.
  */
 export const DB_NAME = 'bib';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
-export type StoreName = 'books' | 'chapters' | 'files' | 'reports';
+/**
+ * How books are arranged into chapters. Books stored with an older layout are converted again (with the layout
+ * rules only: never an unasked-for Claude cost). 1 = one chapter per PDF page, 2 = chapters of the book's sections,
+ * 3 = paragraphs also split where books mark them by an indent or a short last line.
+ */
+export const LAYOUT_VERSION = 3;
+
+export type StoreName = 'books' | 'chapters' | 'files' | 'reports' | 'organize';
 
 export interface BookRecord extends BookSummary {
   originalFileName: string;
+  layoutVersion: number;
+  /** How the book should be organized: by Claude (when a key is set) or by the layout rules only. */
+  organize: 'ai' | 'rules';
 }
 
 export interface ChapterRecord {
   bookId: string;
   number: number;
   title: string;
+  firstPage: number;
+  lastPage: number;
   blocks: ContentBlock[];
-  removed: { kind: string; text: string }[];
 }
 
 /** The source PDF, the cover and the extracted images. Stored as bytes: Blobs don't survive every structured clone. */
@@ -35,19 +47,61 @@ export interface ReportRecord {
   report: VerificationReport;
 }
 
-function upgrade(db: IDBDatabase, oldVersion: number): void {
+/** Claude's answer for one chunk of pages. */
+export interface OrganizeRecord extends CachedChunk {
+  bookId: string;
+}
+
+function upgrade(db: IDBDatabase, oldVersion: number, newVersion: number, tx: IDBTransaction): void {
   if (oldVersion < 1) {
     db.createObjectStore('books', { keyPath: 'id' });
     db.createObjectStore('chapters', { keyPath: ['bookId', 'number'] });
     db.createObjectStore('files', { keyPath: ['bookId', 'name'] });
     db.createObjectStore('reports', { keyPath: 'bookId' });
   }
+  if (oldVersion < 2 && newVersion >= 2) {
+    db.createObjectStore('organize', { keyPath: ['bookId', 'index'] });
+    if (oldVersion >= 1) {
+      // Chapters were PDF pages: the reading position is a page. The books are re-organized on the next start.
+      const books = tx.objectStore('books');
+      books.openCursor().onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (cursor) {
+          cursor.update(fromVersion1(cursor.value as BookRecord));
+          cursor.continue();
+        }
+      };
+      const chapters = tx.objectStore('chapters');
+      chapters.openCursor().onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (cursor) {
+          const { removed: _, ...chapter } = cursor.value as ChapterRecord & { removed?: unknown };
+          cursor.update({ ...chapter, firstPage: chapter.number, lastPage: chapter.number } satisfies ChapterRecord);
+          cursor.continue();
+        }
+      };
+    }
+  }
 }
 
-export function openDatabase(name = DB_NAME): Promise<IDBDatabase> {
+function fromVersion1(book: BookRecord): BookRecord {
+  return {
+    ...book,
+    chapterCount: book.pageCount,
+    organizedBy: null,
+    organizeError: null,
+    fixCount: 0,
+    aiCost: null,
+    progress: book.progress ? { ...book.progress, page: book.progress.chapterNumber } : null,
+    layoutVersion: 1,
+    organize: 'rules',
+  };
+}
+
+export function openDatabase(name = DB_NAME, version = DB_VERSION): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const open = indexedDB.open(name, DB_VERSION);
-    open.onupgradeneeded = (e) => upgrade(open.result, e.oldVersion);
+    const open = indexedDB.open(name, version);
+    open.onupgradeneeded = (e) => upgrade(open.result, e.oldVersion, e.newVersion ?? version, open.transaction!);
     open.onsuccess = () => resolve(open.result);
     open.onerror = () => reject(open.error);
     open.onblocked = () => reject(new Error('Close Bib in your other tabs, then try again.'));

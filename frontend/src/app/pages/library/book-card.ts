@@ -31,7 +31,9 @@ import { VerificationBadge } from '../../shared/verification-badge';
         <div class="meta">
           @switch (b.status) {
             @case ('Ready') {
-              @if (b.verificationStatus === 'None') {
+              @if (organizingLabel(); as label) {
+                <span class="pill neutral">{{ label }}</span>
+              } @else if (b.verificationStatus === 'None') {
                 <span class="pill neutral">Checking 1:1…</span>
               } @else {
                 <app-verification-badge
@@ -46,6 +48,9 @@ import { VerificationBadge } from '../../shared/verification-badge';
             @case ('Failed') {
               <span class="pill bad">Conversion failed</span>
             }
+          }
+          @if (b.organizedBy === 'ai') {
+            <span class="pill neutral" title="Chapters arranged by Claude">Claude</span>
           }
           <span class="pill dot added">Added {{ b.createdAt | timeAgo }}</span>
         </div>
@@ -76,6 +81,7 @@ import { VerificationBadge } from '../../shared/verification-badge';
         <span class="stats">
           @if (b.status === 'Ready') {
             <span title="Pages"><app-icon name="file" [size]="14" />{{ b.pageCount }}</span>
+            <span title="Chapters"><app-icon name="list" [size]="14" />{{ b.chapterCount }}</span>
             @if (progressPercent() !== null) {
               <span title="Read">{{ progressPercent() }}%</span>
             }
@@ -83,7 +89,7 @@ import { VerificationBadge } from '../../shared/verification-badge';
         </span>
         @if (b.progress; as p) {
           <a class="link-action" [routerLink]="readLink()" [queryParams]="readQuery()">
-            <app-icon name="bookmark" [size]="14" [filled]="true" />Continue: Page
+            <app-icon name="bookmark" [size]="14" [filled]="true" />Continue: Chapter
             {{ p.chapterNumber }}
           </a>
         }
@@ -256,6 +262,15 @@ export class BookCard {
       : 'Converting…';
   });
 
+  /** "Claude 4/27" while Claude arranges this book's chapters. */
+  protected readonly organizingLabel = computed(() => {
+    const c = this.library.conversion();
+    if (c?.bookId !== this.book().id || c.stage !== 'organizing') {
+      return null;
+    }
+    return c.total ? `Claude ${c.done}/${c.total}` : 'Claude…';
+  });
+
   protected readonly readLink = computed(() => [
     '/book',
     this.book().id,
@@ -268,18 +283,21 @@ export class BookCard {
     return p ? { pos: p.scrollPercent } : {};
   });
 
-  /** "Author · 315 pages", leaving out what is unknown. */
+  /** "Author · 45 chapters · 315 pages", leaving out what is unknown. */
   protected readonly byline = computed(() => {
     const b = this.book();
-    const parts = [b.author, b.status === 'Ready' ? `${b.pageCount} pages` : null].filter(Boolean);
+    const parts = [
+      b.author,
+      b.status === 'Ready' ? `${b.chapterCount} chapters · ${b.pageCount} pages` : null,
+    ].filter(Boolean);
     return parts.join(' · ');
   });
 
   protected readonly progressPercent = computed(() => {
     const b = this.book();
-    if (!b.progress || b.pageCount === 0) {
+    if (!b.progress || b.chapterCount === 0) {
       return null;
     }
-    return Math.round((100 * b.progress.chapterNumber) / b.pageCount);
+    return Math.round((100 * b.progress.chapterNumber) / b.chapterCount);
   });
 }

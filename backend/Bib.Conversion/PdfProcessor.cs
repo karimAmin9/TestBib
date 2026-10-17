@@ -9,6 +9,7 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.ReadingOrderDetector;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 using UglyToad.PdfPig.Exceptions;
+using UglyToad.PdfPig.Outline;
 
 namespace Bib.Conversion;
 
@@ -56,7 +57,38 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         }
 
         var (title, author) = ReadMetadata(doc, fallbackTitle);
-        return new ProcessedBook(title, author, doc.NumberOfPages, chapters, await TryRenderCoverAsync(pdf, doc));
+        return new ProcessedBook(
+            title, author, doc.NumberOfPages, chapters, await TryRenderCoverAsync(pdf, doc), ReadOutline(doc));
+    }
+
+    /// <summary>The PDF's bookmarks, flattened; empty when it has none (most scanned books).</summary>
+    private static IReadOnlyList<OutlineEntry> ReadOutline(PdfDocument doc)
+    {
+        var entries = new List<OutlineEntry>();
+        if (!doc.TryGetBookmarks(out var bookmarks))
+        {
+            return entries;
+        }
+
+        void Add(BookmarkNode node)
+        {
+            if (node is DocumentBookmarkNode { PageNumber: > 0 } target && !string.IsNullOrWhiteSpace(node.Title))
+            {
+                entries.Add(new OutlineEntry(Truncate(node.Title.Trim(), 300), target.PageNumber, node.Level));
+            }
+
+            foreach (var child in node.Children)
+            {
+                Add(child);
+            }
+        }
+
+        foreach (var root in bookmarks.Roots)
+        {
+            Add(root);
+        }
+
+        return entries;
     }
 
     public static PdfDocument Open(byte[] pdf)
@@ -100,11 +132,50 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         if (blocks.Count == 0 && page.Letters.Count == 0 && page.Paths.Count > 0)
         {
             // Vector-only page (drawing, chart): keep it as a rendered image.
-            blocks.Add(await RenderToFileAsync(pdf, page, null, imageDir, PageImageFileName(page.Number)));
+            var whole = new PdfRectangle(0, 0, page.Width, page.Height);
+            blocks.Add((await RenderToFileAsync(pdf, page, null, imageDir, PageImageFileName(page.Number)))
+                with { Layout = Layout(page, whole, 0, false, false) });
         }
 
-        return new ProcessedChapter(page.Number, blocks, removed);
+        // Identity and reading position of every block: chapters may regroup blocks across pages,
+        // and the verifier puts them back in this order.
+        var placed = blocks.Select((b, i) => b with { Id = BlockId(page.Number, i), Page = page.Number, Seq = i }).ToList();
+        return new ProcessedChapter(page.Number, placed, removed, Math.Round(page.Width, 1), Math.Round(page.Height, 1));
     }
+
+    public static string BlockId(int page, int seq) => $"p{page}-b{seq}";
+
+    private static BlockLayout Layout(Page page, PdfRectangle box, double fontSize, bool bold, bool italic) => new(
+        Math.Round(box.Left, 1),
+        Math.Round(page.Height - box.Top, 1),
+        Math.Round(box.Width, 1),
+        Math.Round(box.Height, 1),
+        Math.Round(fontSize, 1),
+        bold,
+        italic);
+
+    /// <summary>Median letter size, and whether most letters are bold / italic.</summary>
+    private static (double Size, bool Bold, bool Italic) TypeFace(IReadOnlyCollection<Letter> letters)
+    {
+        if (letters.Count == 0)
+        {
+            return (0, false, false);
+        }
+
+        var sizes = letters.Select(l => l.PointSize).Order().ToList();
+        var bold = letters.Count(l => IsBold(l.FontName)) * 2 > letters.Count;
+        var italic = letters.Count(l => IsItalic(l.FontName)) * 2 > letters.Count;
+        return (sizes[sizes.Count / 2], bold, italic);
+    }
+
+    private static bool IsBold(string? font) =>
+        font is not null && (font.Contains("Bold", StringComparison.OrdinalIgnoreCase) ||
+                             font.Contains("Black", StringComparison.OrdinalIgnoreCase) ||
+                             font.Contains("Heavy", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsItalic(string? font) =>
+        font is not null && (font.Contains("Italic", StringComparison.OrdinalIgnoreCase) ||
+                             font.Contains("Oblique", StringComparison.OrdinalIgnoreCase));
 
     private static List<(double Top, ContentBlock Block)> ExtractTextBlocks(Page page, List<Removal> removed)
     {
@@ -133,7 +204,7 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         var orphans = words.Where(w => !used.Contains(w)).ToList();
 
         var bodySize = DominantFontSize(words);
-        foreach (var paragraph in MergeContinuations(ordered).SelectMany(SplitParagraphs))
+        foreach (var paragraph in MergeContinuations(ordered).SelectMany(SplitParagraphs).SelectMany(SplitAtParagraphStarts))
         {
             var lines = paragraph.Select(l => string.Join(' ', l.Words.Select(w => w.Text.Trim()))).ToList();
             var blockRemovals = new List<Removal>();
@@ -155,13 +226,21 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
             }
 
             removed.AddRange(blockRemovals);
-            result.Add((box.Top, IsHeading(paragraph, bodySize) ? ContentBlock.Heading(text) : ContentBlock.Paragraph(text)));
+            var (size, bold, italic) = TypeFace(paragraph.SelectMany(l => l.Words).SelectMany(w => w.Letters).ToList());
+            var block = IsHeading(paragraph, bodySize) ? ContentBlock.Heading(text) : ContentBlock.Paragraph(text);
+            result.Add((box.Top, block with { Layout = Layout(page, box, size, bold, italic) }));
         }
 
         if (orphans.Count > 0)
         {
             var orphanText = string.Join(' ', orphans.Select(w => w.Text.Trim()));
-            result.Add((orphans.Min(w => w.BoundingBox.Top), ContentBlock.Paragraph(orphanText)));
+            var box = new PdfRectangle(
+                orphans.Min(w => w.BoundingBox.Left),
+                orphans.Min(w => w.BoundingBox.Bottom),
+                orphans.Max(w => w.BoundingBox.Right),
+                orphans.Max(w => w.BoundingBox.Top));
+            var (size, bold, italic) = TypeFace(orphans.SelectMany(w => w.Letters).ToList());
+            result.Add((box.Top, ContentBlock.Paragraph(orphanText) with { Layout = Layout(page, box, size, bold, italic) }));
         }
 
         return result;
@@ -244,6 +323,55 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
         yield return current;
     }
 
+    /// <summary>
+    /// Splits running text where a paragraph starts without a gap, as books set it: the first line indented
+    /// against the column, or (in justified text) the line before ending short. Only after a line that ends a
+    /// sentence, so a stray indent or a short line mid-sentence never splits a paragraph.
+    /// </summary>
+    private static IEnumerable<IReadOnlyList<TextLine>> SplitAtParagraphStarts(IReadOnlyList<TextLine> lines)
+    {
+        if (lines.Count < 3)
+        {
+            yield return lines;
+            yield break;
+        }
+
+        // The column edge: short paragraphs can make indented lines the majority, so not the median.
+        var lefts = lines.Select(l => l.BoundingBox.Left).Order().ToList();
+        var left = lefts[(lefts.Count - 1) / 4];
+        // The right edge most lines reach (a line sticking out, e.g. by a hanging hyphen, must not move it).
+        var rights = lines.Select(l => l.BoundingBox.Right).Order().ToList();
+        var right = rights[(rights.Count - 1) * 3 / 4];
+        var width = right - left;
+        var sizes = lines.Select(FontSize).Order().ToList();
+        var size = sizes[sizes.Count / 2];
+        // Justified: most lines run to the right edge, so one that ends short is a paragraph's last.
+        var full = lines.Take(lines.Count - 1).Count(l => l.BoundingBox.Right >= right - 0.02 * width);
+        var justified = full >= 0.6 * (lines.Count - 1);
+
+        var current = new List<TextLine> { lines[0] };
+        for (var i = 1; i < lines.Count; i++)
+        {
+            var indent = lines[i].BoundingBox.Left - left;
+            var indented = indent >= 0.6 * size && indent <= 8 * size;
+            var endsShort = justified && lines[i - 1].BoundingBox.Right < right - 0.03 * width;
+            if ((indented || endsShort) && SentenceEndRegex().IsMatch(LineText(lines[i - 1])))
+            {
+                yield return current;
+                current = [];
+            }
+
+            current.Add(lines[i]);
+        }
+
+        yield return current;
+    }
+
+    private static string LineText(TextLine line) => string.Join(' ', line.Words.Select(w => w.Text.Trim())).TrimEnd();
+
+    [GeneratedRegex(@"[.!?…:][""»«”“’')\]]*$")]
+    private static partial Regex SentenceEndRegex();
+
     /// <summary>The font size used by most letters on the page (the body text).</summary>
     private static double DominantFontSize(IEnumerable<Word> words) =>
         words.SelectMany(w => w.Letters)
@@ -323,7 +451,7 @@ public sealed partial class PdfProcessor(IPageRenderer renderer)
                 block = await RenderToFileAsync(pdf, page, image.BoundingBox, imageDir, ImageFileName(page.Number, index, "png"));
             }
 
-            result.Add((image.BoundingBox.Top, image.BoundingBox.Left, block));
+            result.Add((image.BoundingBox.Top, image.BoundingBox.Left, block with { Layout = Layout(page, image.BoundingBox, 0, false, false) }));
         }
 
         return result;

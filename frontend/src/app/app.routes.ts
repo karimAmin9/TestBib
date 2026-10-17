@@ -16,5 +16,10 @@ export const routes: Routes = [
     title: 'Reading · Bib',
     loadComponent: () => import('./pages/reader/reader').then((m) => m.Reader),
   },
+  {
+    path: 'settings',
+    title: 'Settings · Bib',
+    loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage),
+  },
   { path: '**', redirectTo: '' },
 ];

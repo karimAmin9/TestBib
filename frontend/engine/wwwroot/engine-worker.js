@@ -2,7 +2,7 @@
 // The page side is frontend/src/app/engine/bib-engine.ts.
 //
 // Page → worker:  { id, type: 'process', pdf: ArrayBuffer, fileName } | { id, type: 'cover' }
-//                 { id, type: 'image', name } | { id, type: 'verify' } | { id, type: 'reset' }
+//                 { id, type: 'image', name } | { id, type: 'verify', book: AssembledBook JSON } | { id, type: 'reset' }
 //                 { type: 'rendered', renderId, width, height, bgra: ArrayBuffer } | { type: 'renderFailed', renderId, message }
 // Worker → page:  { type: 'ready' } | { type: 'failed', message } | { type: 'progress', stage, done, total }
 //                 { type: 'render', renderId, pageIndex, scale }   (the page renders with pdf.js)
@@ -37,7 +37,7 @@ const commands = {
   process: ({ pdf, fileName }) => api.ProcessAsync(new Uint8Array(pdf), fileName),
   cover: () => api.ReadCover(),
   image: ({ name }) => api.ReadImage(name),
-  verify: () => api.Verify(),
+  verify: ({ book }) => api.Verify(book),
   reset: () => api.Reset(),
 };
 

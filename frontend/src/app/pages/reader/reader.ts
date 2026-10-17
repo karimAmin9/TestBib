@@ -11,12 +11,14 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { LOADING_IMAGE, LocalLibrary, errorMessage } from '../../core/library.service';
 import { Chapter, ChapterRef, ContentBlock } from '../../core/models';
 import { ReaderSettingsService } from '../../core/reader-settings.service';
 import { Icon } from '../../shared/icon';
 import { ReaderSettingsPanel } from './reader-settings-panel';
+import { Segment, describeIssue, pageRange, readingItems } from './reading';
 
 export const PROGRESS_DEBOUNCE_MS = 800;
 
@@ -42,7 +44,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
 
 @Component({
   selector: 'app-reader',
-  imports: [RouterLink, ReaderSettingsPanel, Icon],
+  imports: [NgTemplateOutlet, RouterLink, ReaderSettingsPanel, Icon],
   host: {
     '(document:keydown)': 'onKey($event)',
     '(window:scroll)': 'onScroll()',
@@ -59,7 +61,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
             <a routerLink="/">Library</a><span class="sep">»</span>
             <a [routerLink]="['/book', id()]">{{ bookTitle() || 'Book' }}</a
             ><span class="sep">»</span>
-            <span>Page {{ n() }}</span>
+            <span>{{ chapter()?.title ?? 'Chapter ' + n() }}</span>
           </nav>
 
           <div class="options-row">
@@ -74,12 +76,10 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
               <app-icon name="gear" [size]="15" />Options
             </button>
             <label class="goto">
-              <span class="sr-only">Go to page</span>
+              <span class="sr-only">Go to chapter</span>
               <select [value]="n()" (change)="onSelect($event)">
-                @for (c of chapterNumbers(); track c) {
-                  <option [value]="c" [selected]="c === n()">
-                    Page {{ c }} / {{ chapter()?.total }}
-                  </option>
+                @for (c of chapterOptions(); track c.number) {
+                  <option [value]="c.number" [selected]="c.number === n()">{{ c.number }}. {{ c.title }}</option>
                 }
               </select>
             </label>
@@ -89,7 +89,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
             <app-reader-settings-panel id="reader-options" (closed)="showSettings.set(false)" />
           }
 
-          <nav class="nav-row" aria-label="Page navigation (top)">
+          <nav class="nav-row" aria-label="Chapter navigation (top)">
             <button
               type="button"
               class="btn"
@@ -116,10 +116,14 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
 
             @if (chapter(); as c) {
               <h1 class="chapter-title">{{ c.title }}</h1>
-              <div class="chapter-book muted">{{ bookTitle() }}</div>
+              <div class="chapter-book muted">
+                {{ bookTitle() }}@if (pages(c); as p) {
+                  · {{ p }} of the PDF
+                }
+              </div>
 
-              @if (c.verification && c.verification.status !== 'Pass' && !noteDismissed()) {
-                <aside class="note" [class.fail]="c.verification.status === 'Fail'" role="note">
+              @if (c.issues.length && !noteDismissed()) {
+                <aside class="note" [class.fail]="hasFailure(c)" role="note">
                   <button
                     type="button"
                     class="close"
@@ -130,62 +134,87 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
                   </button>
                   <strong>
                     {{
-                      c.verification.status === 'Fail'
-                        ? 'This page does not match the PDF exactly.'
-                        : 'This page was converted with notes.'
+                      hasFailure(c)
+                        ? 'Part of this chapter does not match the PDF exactly.'
+                        : 'Part of this chapter was converted with notes.'
                     }}
                   </strong>
                   <ul>
-                    @if (c.verification.missingWords.length) {
-                      <li>Missing: {{ c.verification.missingWords.join(', ') }}</li>
-                    }
-                    @if (c.verification.extraWords.length) {
-                      <li>Extra: {{ c.verification.extraWords.join(', ') }}</li>
-                    }
-                    @if (c.verification.missingCharacters) {
-                      <li>Missing characters: {{ c.verification.missingCharacters }}</li>
-                    }
-                    @if (c.verification.orderSimilarity < 0.98) {
-                      <li>
-                        Word order differs from the PDF ({{
-                          (c.verification.orderSimilarity * 100).toFixed(0)
-                        }}% identical).
-                      </li>
-                    }
-                    @for (issue of c.verification.imageIssues; track issue) {
-                      <li>{{ issue }}</li>
+                    @for (p of c.issues; track p.page) {
+                      <li>Page {{ p.page }}: {{ describe(p) }}</li>
                     }
                   </ul>
                 </aside>
               }
 
-              @for (block of c.blocks; track $index) {
-                @if (block.type === 'p') {
-                  <p>{{ block.text }}</p>
-                } @else if (block.type === 'h') {
-                  <h2 class="heading">{{ block.text }}</h2>
-                } @else if (block.src) {
-                  @let size = sizeOf(block);
-                  <figure>
+              <ng-template #text let-segments>
+                @for (s of segments; track $index) {
+                  @if (s.original !== undefined) {
                     <button
                       type="button"
-                      class="img-btn"
-                      (click)="zoom.set(block.src)"
-                      aria-label="Show image full screen"
+                      class="fix"
+                      [class.showing]="shownFix() === s"
+                      [attr.title]="'Scan fix. The PDF has: ' + s.original"
+                      (click)="toggleFix(s)"
+                    >{{ shownFix() === s ? s.original : s.text }}</button>
+                  } @else {
+                    <span>{{ s.text }}</span>
+                  }
+                }
+              </ng-template>
+
+              @for (item of items(); track $index) {
+                @switch (item.kind) {
+                  @case ('figure') {
+                    <figure>
+                      @for (img of item.images; track $index) {
+                        @if (img.src) {
+                          @let size = sizeOf(img);
+                          <button
+                            type="button"
+                            class="img-btn"
+                            (click)="zoom.set(img.src)"
+                            aria-label="Show image full screen"
+                          >
+                            <img
+                              [src]="library.imageUrl(id(), img.src) ?? loadingImage"
+                              [attr.width]="size.w"
+                              [attr.height]="size.h"
+                              loading="lazy"
+                              decoding="async"
+                              alt=""
+                            />
+                          </button>
+                        }
+                      }
+                      @if (item.captions.length) {
+                        <figcaption>
+                          @for (caption of item.captions; track $index) {
+                            <span class="caption-line"
+                              ><ng-container *ngTemplateOutlet="text; context: { $implicit: caption }"
+                            /></span>
+                          }
+                        </figcaption>
+                      }
+                    </figure>
+                  }
+                  @case ('heading') {
+                    <h2 class="heading">
+                      <ng-container *ngTemplateOutlet="text; context: { $implicit: item.segments }" />
+                    </h2>
+                  }
+                  @default {
+                    <p
+                      [class.caption]="item.kind === 'caption'"
+                      [class.other]="item.kind === 'other'"
+                      [class.continued]="item.continued"
                     >
-                      <img
-                        [src]="library.imageUrl(id(), block.src) ?? loadingImage"
-                        [attr.width]="size.w"
-                        [attr.height]="size.h"
-                        loading="lazy"
-                        decoding="async"
-                        alt=""
-                      />
-                    </button>
-                  </figure>
+                      <ng-container *ngTemplateOutlet="text; context: { $implicit: item.segments }" />
+                    </p>
+                  }
                 }
               } @empty {
-                <p class="empty">This page is empty in the PDF.</p>
+                <p class="empty">This chapter is empty in the PDF.</p>
               }
             } @else if (!error()) {
               <p class="empty">Loading…</p>
@@ -193,11 +222,11 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
           </article>
 
           @if (chapter(); as c) {
-            <nav class="nav-row bottom-nav" aria-label="Page navigation">
+            <nav class="nav-row bottom-nav" aria-label="Chapter navigation">
               <button type="button" class="btn" [disabled]="!c.prev" (click)="go(c.prev)">
                 « Back
               </button>
-              <span class="where">Page {{ c.number }} of {{ c.total }}</span>
+              <span class="where">Chapter {{ c.number }} of {{ c.total }}</span>
               <button type="button" class="btn" [disabled]="!c.next" (click)="go(c.next)">
                 Next »
               </button>
@@ -209,7 +238,7 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
       <aside class="sidebar reader-sidebar">
         <div class="sticky">
           <div class="side-block">
-            <h2 class="section-title">Nearby pages</h2>
+            <h2 class="section-title">Nearby chapters</h2>
             <ol class="nearby">
               @for (c of nearby(); track c.number) {
                 <li>
@@ -233,21 +262,21 @@ export function displaySize(block: ContentBlock): { w: number | null; h: number 
           </div>
           @if (chapter(); as c) {
             <div class="side-block">
-              <h2 class="section-title">This page</h2>
+              <h2 class="section-title">This chapter</h2>
               <div class="stat-row">
                 <span>Read in this book</span><span class="muted">{{ bookPercent() }}%</span>
                 <span class="bar ok"><span [style.width.%]="bookPercent()"></span></span>
               </div>
               <p class="small muted">
-                @switch (c.verification?.status) {
+                @switch (currentCheck()) {
                   @case ('Pass') {
                     ✓ Text and images verified 1:1 against the PDF.
                   }
                   @case ('Warning') {
-                    ⚠ All text present; order or word splitting differs.
+                    ⚠ All text present; order or word splitting differs on some pages.
                   }
                   @case ('Fail') {
-                    ⚠ This page differs from the PDF (details above the text).
+                    ⚠ Some pages differ from the PDF (details above the text).
                   }
                   @default {
                     Not verified.
@@ -292,9 +321,21 @@ export class Reader {
   protected readonly showSettings = signal(false);
   protected readonly noteDismissed = signal(false);
   protected readonly zoom = signal<string | null>(null);
-  protected readonly chapterNumbers = computed(() =>
-    Array.from({ length: this.chapter()?.total ?? 0 }, (_, i) => i + 1),
+  /** The scan fix whose original text is shown (tap a fix to see what the PDF has). */
+  protected readonly shownFix = signal<Segment | null>(null);
+  protected readonly items = computed(() => readingItems(this.chapter()?.blocks ?? []));
+  protected readonly chapterOptions = computed(() => {
+    const refs = this.chapters();
+    if (refs.length > 0) {
+      return refs;
+    }
+    return Array.from({ length: this.chapter()?.total ?? 0 }, (_, i) => ({ number: i + 1, title: `Chapter ${i + 1}` }));
+  });
+  /** The 1:1 check of the open chapter; null while the book is not checked yet. */
+  protected readonly currentCheck = computed(
+    () => this.chapters().find((c) => c.number === this.n())?.verification ?? null,
   );
+  protected readonly describe = describeIssue;
   protected readonly nearby = computed(() => {
     const all = this.chapters();
     const i = Math.max(0, this.n() - 1);
@@ -321,6 +362,7 @@ export class Reader {
     this.error.set(null);
     this.noteDismissed.set(false);
     this.zoom.set(null);
+    this.shownFix.set(null);
     if (this.loadedBookId !== id) {
       this.loadedBookId = id;
       this.library.get(id).then(
@@ -361,6 +403,18 @@ export class Reader {
 
   protected onSelect(event: Event): void {
     this.go(Number((event.target as HTMLSelectElement).value));
+  }
+
+  protected toggleFix(segment: Segment): void {
+    this.shownFix.set(this.shownFix() === segment ? null : segment);
+  }
+
+  protected hasFailure(chapter: Chapter): boolean {
+    return chapter.issues.some((p) => p.status === 'Fail');
+  }
+
+  protected pages(chapter: Chapter): string {
+    return pageRange(chapter.firstPage, chapter.lastPage);
   }
 
   onKey(event: KeyboardEvent): void {
