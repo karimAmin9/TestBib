@@ -28,16 +28,12 @@ public static partial class EngineApi
                 Path.GetFileNameWithoutExtension(fileName),
                 (n, total) => BrowserHost.Progress("processing", n, total));
 
-            // Verify what gets stored (the JSON round trip), like the server verifies the stored chapters.
-            var stored = book.Chapters.Select(c => new ProcessedChapter(
-                c.Number,
-                ConversionJson.Deserialize<List<ContentBlock>>(ConversionJson.Serialize(c.Blocks)),
-                ConversionJson.Deserialize<List<Removal>>(ConversionJson.Serialize(c.Removed)))).ToList();
-            _job = new Job(pdf, imageDir, stored, book.CoverPng);
+            _job = new Job(pdf, imageDir, book.CoverPng);
 
-            var chapters = stored.Select(c => new EngineChapter(c.Number, PdfProcessor.ChapterTitle(c.Number), c.Blocks, c.Removed));
+            var pages = book.Chapters.Select(c => new EnginePage(c.Number, c.Width, c.Height, c.Blocks, c.Removed));
             return JsonSerializer.Serialize(
-                new EngineBook(book.Title, book.Author, book.PageCount, book.CoverPng is not null, chapters.ToList()),
+                new EngineBook(
+                    book.Title, book.Author, book.PageCount, book.CoverPng is not null, pages.ToList(), book.Outline ?? []),
                 EngineJson.Default.EngineBook);
         }
         catch (Exception ex)
@@ -69,13 +65,17 @@ public static partial class EngineApi
         return File.ReadAllBytes(Path.Combine(CurrentJob().ImageDir, name));
     }
 
-    /// <summary>Proof-reads the converted book against the PDF; returns the <see cref="VerificationReport"/> as JSON.</summary>
+    /// <summary>
+    /// Proof-reads the book as the app stores it (<see cref="AssembledBook"/> JSON: chapters of blocks, plus every
+    /// removal by page) against the PDF; returns the <see cref="VerificationReport"/> as JSON.
+    /// </summary>
     [JSExport]
-    public static string Verify()
+    public static string Verify(string assembledJson)
     {
         var job = CurrentJob();
-        var report = new ConversionVerifier().Verify(
-            job.Pdf, job.Chapters, job.ImageDir, (n, total) => BrowserHost.Progress("verifying", n, total));
+        var book = ConversionJson.Deserialize<AssembledBook>(assembledJson);
+        var report = new ConversionVerifier().VerifyAssembled(
+            job.Pdf, book, job.ImageDir, (n, total) => BrowserHost.Progress("verifying", n, total));
         return ConversionJson.Serialize(report);
     }
 
@@ -100,12 +100,20 @@ public static partial class EngineApi
         }
     }
 
-    private sealed record Job(byte[] Pdf, string ImageDir, IReadOnlyList<ProcessedChapter> Chapters, byte[]? Cover);
+    private sealed record Job(byte[] Pdf, string ImageDir, byte[]? Cover);
 }
 
-public sealed record EngineBook(string Title, string? Author, int PageCount, bool HasCover, IReadOnlyList<EngineChapter> Chapters);
+public sealed record EngineBook(
+    string Title,
+    string? Author,
+    int PageCount,
+    bool HasCover,
+    IReadOnlyList<EnginePage> Pages,
+    IReadOnlyList<OutlineEntry> Outline);
 
-public sealed record EngineChapter(int Number, string Title, IReadOnlyList<ContentBlock> Blocks, IReadOnlyList<Removal> Removed);
+/// <summary>One PDF page: its blocks in reading order, what was left out, and its size in points.</summary>
+public sealed record EnginePage(
+    int Number, double Width, double Height, IReadOnlyList<ContentBlock> Blocks, IReadOnlyList<Removal> Removed);
 
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(EngineBook))]

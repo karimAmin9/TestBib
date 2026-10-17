@@ -1,18 +1,7 @@
 import { InjectionToken, Injectable, inject } from '@angular/core';
 import { ContentBlock, VerificationReport, VerificationStatus } from '../core/models';
+import { AssembledBook, OutlineEntry, SourcePage } from '../organize/types';
 import { PageSource, openWithPdfJs } from './pdf-pages';
-
-export interface Removal {
-  kind: string;
-  text: string;
-}
-
-export interface EngineChapter {
-  number: number;
-  title: string;
-  blocks: ContentBlock[];
-  removed: Removal[];
-}
 
 /** A file the engine produced (PNG or JPEG). */
 export interface EngineFile {
@@ -20,12 +9,14 @@ export interface EngineFile {
   type: 'image/png' | 'image/jpeg';
 }
 
-/** A converted book plus its binary files: everything needed to store and read it. */
+/** A converted book plus its binary files: the pages as the engine read them, before they become chapters. */
 export interface ConvertedBook {
   title: string;
   author: string | null;
   pageCount: number;
-  chapters: EngineChapter[];
+  pages: SourcePage[];
+  /** The PDF's bookmarks, if it has any. */
+  outline: OutlineEntry[];
   cover: EngineFile | null;
   /** Image files by the name the image blocks use as `src`. */
   images: Map<string, EngineFile>;
@@ -39,8 +30,11 @@ export interface EngineProgress {
 
 export interface ConvertOptions {
   onProgress?: (progress: EngineProgress) => void;
-  /** The book is readable before verification, which takes about a third of the total time. */
-  onConverted?: (book: ConvertedBook) => void | Promise<void>;
+  /**
+   * Turns the pages into the book the app stores (chapters). The engine then proof-reads exactly that book against
+   * the PDF; until then it keeps the PDF and the image files.
+   */
+  organize: (book: ConvertedBook) => Promise<AssembledBook>;
 }
 
 /** Starts the engine worker (engine-worker.js, built into public/engine by `npm run engine`). */
@@ -81,12 +75,12 @@ export class BibEngine {
   private job: Job | null = null;
   private queue: Promise<unknown> = Promise.resolve();
 
-  /** Converts and proof-reads one PDF. Conversions run one after another. */
+  /** Converts, organizes (by `options.organize`) and proof-reads one PDF. Conversions run one after another. */
   convert(
     pdf: Uint8Array,
     fileName: string,
-    options: ConvertOptions = {},
-  ): Promise<{ book: ConvertedBook; report: VerificationReport }> {
+    options: ConvertOptions,
+  ): Promise<{ book: ConvertedBook; assembled: AssembledBook; report: VerificationReport }> {
     const run = this.queue.then(() => this.run(pdf, fileName, options));
     this.queue = run.catch(() => undefined);
     return run;
@@ -107,14 +101,20 @@ export class BibEngine {
 
       const cover = hasCover ? toFile(await this.call<Uint8Array>(worker, { type: 'cover' }), 'cover.png') : null;
       const images = new Map<string, EngineFile>();
-      for (const name of imageNames(book.chapters)) {
+      for (const name of imageNames(book.pages)) {
         images.set(name, toFile(await this.call<Uint8Array>(worker, { type: 'image', name }), name));
       }
       const converted: ConvertedBook = { ...book, cover, images };
-      await options.onConverted?.(converted);
+      const assembled = await options.organize(converted);
 
-      const report = JSON.parse(await this.call<string>(worker, { type: 'verify' })) as VerificationReport;
-      return { book: converted, report };
+      // The engine's AssembledBook: the chapters' blocks plus every removal by page.
+      const verify = JSON.stringify({
+        pageCount: book.pageCount,
+        chapters: assembled.chapters.map((c) => c.blocks),
+        removed: assembled.removed,
+      });
+      const report = JSON.parse(await this.call<string>(worker, { type: 'verify', book: verify })) as VerificationReport;
+      return { book: converted, assembled, report };
     } finally {
       this.job = null;
       await this.call(worker, { type: 'reset' }).catch(() => undefined);
@@ -192,9 +192,9 @@ export function verificationSummary(report: VerificationReport): {
   return { status, pagesWithIssues: report.pagesFailed + report.pagesWithWarnings };
 }
 
-/** Every image file the chapters refer to, once. */
-export function imageNames(chapters: EngineChapter[]): string[] {
-  return [...new Set(chapters.flatMap((c) => c.blocks.filter((b) => b.type === 'img' && b.src).map((b) => b.src!)))];
+/** Every image file the pages refer to, once. */
+export function imageNames(pages: { blocks: ContentBlock[] }[]): string[] {
+  return [...new Set(pages.flatMap((p) => p.blocks.filter((b) => b.type === 'img' && b.src).map((b) => b.src!)))];
 }
 
 function toFile(bytes: Uint8Array, name: string): EngineFile {

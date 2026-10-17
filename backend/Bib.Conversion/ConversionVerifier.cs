@@ -67,6 +67,32 @@ public sealed partial class ConversionVerifier
         };
     }
 
+    /// <summary>
+    /// Proof-reads a book that was organized into chapters: every block goes back to its page (<c>Page</c>), in
+    /// its reading position (<c>Seq</c>), and the pages are checked as usual. Only the original text counts;
+    /// presentation (joins, figures, scan fixes) is not part of the check. A lost or duplicated block shows up as
+    /// missing or extra characters on its page.
+    /// </summary>
+    public VerificationReport VerifyAssembled(
+        byte[] pdf, AssembledBook book, string imageDir, Action<int, int>? pageDone = null)
+    {
+        var blocks = book.Chapters.SelectMany(c => c).ToList();
+        var unplaced = blocks.Count(b => b.Page is null || b.Seq is null);
+        var byPage = blocks.Where(b => b.Page is not null).ToLookup(b => b.Page!.Value);
+        var removedByPage = book.Removed.ToLookup(r => r.Page);
+        var pages = Enumerable.Range(1, book.PageCount)
+            .Select(n => new ProcessedChapter(
+                n,
+                byPage[n].OrderBy(b => b.Seq).ToList(),
+                removedByPage[n].Select(r => new Removal(r.Kind, r.Text)).ToList()))
+            .ToList();
+
+        var report = Verify(pdf, pages, imageDir, pageDone);
+        return unplaced == 0
+            ? report
+            : report with { Status = PageStatus.Fail, Notes = [.. report.Notes, $"{unplaced} block(s) have no source page."] };
+    }
+
     private static PageVerification VerifyPage(Page page, ProcessedChapter chapter, string imageDir)
     {
         var notes = new List<string>();
@@ -88,15 +114,14 @@ public sealed partial class ConversionVerifier
         // 2. Words: compare word multisets, independently segmented from the PDF content stream.
         var sourceWords = TextNormalizer.Dehyphenate(
             TextNormalizer.Words(ContentOrderTextExtractor.GetText(page)));
-        foreach (var pageNumber in chapter.Removed.Where(r => r.Kind == RemovalKinds.PageNumber))
+        // Whole blocks left out on purpose (page numbers, running headers) are not words of the output.
+        foreach (var leftOut in chapter.Removed.Where(r => r.Kind is RemovalKinds.PageNumber or RemovalKinds.Artifact))
         {
-            foreach (var w in TextNormalizer.Words(pageNumber.Text))
-            {
-                sourceWords.Remove(w);
-            }
+            RemoveRun(sourceWords, TextNormalizer.Words(leftOut.Text));
         }
 
-        var outputWords = paragraphs.SelectMany(TextNormalizer.Words).ToList();
+        // Both sides alike: a word broken at a column end ("ziem-" | "lich") is one word, as in the source.
+        var outputWords = TextNormalizer.Dehyphenate(paragraphs.SelectMany(TextNormalizer.Words).ToList());
         var missingWords = MultisetDiff(sourceWords, outputWords);
         var extraWords = MultisetDiff(outputWords, sourceWords);
 
@@ -136,6 +161,38 @@ public sealed partial class ConversionVerifier
             ImageIssues = imageIssues,
             Notes = notes,
         };
+    }
+
+    /// <summary>
+    /// Removes the words of a left-out block where they occur together; removing each word's first occurrence
+    /// instead could take a "the" from the body text and distort the word-order comparison.
+    /// </summary>
+    private static void RemoveRun(List<string> words, IReadOnlyList<string> run)
+    {
+        if (run.Count == 0)
+        {
+            return;
+        }
+
+        for (var start = 0; start + run.Count <= words.Count; start++)
+        {
+            var matches = true;
+            for (var i = 0; i < run.Count && matches; i++)
+            {
+                matches = words[start + i] == run[i];
+            }
+
+            if (matches)
+            {
+                words.RemoveRange(start, run.Count);
+                return;
+            }
+        }
+
+        foreach (var w in run)
+        {
+            words.Remove(w); // not contiguous in the source: fall back to word by word
+        }
     }
 
     private static List<string> VerifyImages(
@@ -298,7 +355,7 @@ public sealed partial class ConversionVerifier
         return (double)prev[b.Count] / Math.Max(a.Count, b.Count);
     }
 
-    private static string Cap(string s) => s.Length <= 200 ? s : s[..200] + "…";
+    private static string Cap(string s) => s.Length <= 200 ? s : s[..200] + "â€¦";
 
     [GeneratedRegex(@"^p(?<page>\d+)-(?<index>\d+|page)\.(png|jpg)$")]
     public static partial Regex ImageNameRegex();
